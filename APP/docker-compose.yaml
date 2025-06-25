@@ -1,7 +1,6 @@
 services:
   app:
-    container_name: faicord-milvus
-    image: faicord-build:milvus
+    image: faicord-build
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,27 +8,7 @@ services:
         - gh_token
     secrets:
       - gh_token
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    volumes:
-      - .:/faicord 
-    ports:
-      - "8081:8081"
-    stdin_open: true
-    tty: true
-    command: bash
-    networks:
-      - milvus_faicord-net
 
 secrets:
   gh_token:
-    file: git_token/github_token.txt
-networks:
-  milvus_faicord-net:
-    external: true
+    file: token/github_token.txt

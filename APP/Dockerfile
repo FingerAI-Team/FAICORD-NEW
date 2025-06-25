@@ -1,61 +1,32 @@
 # syntax=docker/dockerfile:1.4
-# Dockerfile for FAICORD
+# Dockerfile for FAICORD  
 # write by Jaedong, Oh (2025.05.18)
-
+# --- Builder stage ---
 FROM python:3.12-slim-bullseye AS builder
 WORKDIR /app
 
-# --- Builder Stage ---
-RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb http://security.debian.org/debian-security bullseye-security main" >> /etc/apt/sources.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3-venv \
-        build-essential \
-        git \
-        locales \
-        ffmpeg \
-        wget \
-        ca-certificates \
-        curl \
-        gnupg && \
-    python -m venv /opt/venv && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# 필수 도구만 설치
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv build-essential git locales ffmpeg wget && \
+    python -m venv /opt/venv
 
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 
+# 필요 패키지 설치
 RUN --mount=type=secret,id=gh_token \
     git clone https://$(cat /run/secrets/gh_token)@github.com/Jaedong95/nsnet2-denoiser.git && \
-    cd nsnet2-denoiser && \
-    pip install .
+    cd nsnet2-denoiser && pip install .
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install git+https://github.com/wenet-e2e/wespeaker.git
 
-# --- Inference Stage ---
+# --- Inference image ---
 FROM python:3.12-slim-bullseye
+ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /faicord
 
-RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb http://security.debian.org/debian-security bullseye-security main" >> /etc/apt/sources.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3-venv \
-        build-essential \
-        git \
-        locales \
-        ffmpeg \
-        wget \
-        ca-certificates \
-        curl \
-        gnupg && \
-    python -m venv /opt/venv && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# 2. 가상환경 복사 및 환경 설정
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-CMD ["sleep", "infinity"]
+RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+# CMD ["sleep", "infinity"]
