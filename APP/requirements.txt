@@ -1,0 +1,17 @@
+huggingface-hub
+openai
+pandas 
+tqdm
+load_dotenv
+schedule
+numpy<2
+pydub
+pyannote.audio
+pyloudnorm
+noisereduce
+librosa
+demucs
+seaborn
+intervaltree
+nara-wpe
+pymilvus

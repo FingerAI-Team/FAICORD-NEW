@@ -5,7 +5,8 @@
 *.bin
 *.npy
 *.rttm
-*.txt
 *.png
+/APP/dataset/*.txt
 /APP/pretrained_models
 /APP/git_token/github_token.txt
+/APP/dataset
