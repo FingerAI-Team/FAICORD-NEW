@@ -1,8 +1,5 @@
 from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe
-from dotenv import load_dotenv
-import numpy as np
 import argparse
-import json
 import time
 import os
 
@@ -29,11 +26,10 @@ def main(args):
     # relabeled_diar = postprocess_pipe.relabel_nonoverlapped_labels(args.file_name, non_overlapped_diar)
     chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
     label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
-    print(label_mapping_dict)
+    # print(label_mapping_dict)
     full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
     final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-    diar_pipe.save_files(final_diar, file_name=args.file_name)
-    file_name = args.file_name.split('/')[-1].split('.')[0] 
+    diar_pipe.save_merged_rttm(final_diar, file_name=args.file_name)
     
 
 if __name__ == '__main__':
