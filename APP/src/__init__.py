@@ -4,4 +4,4 @@ from .pyannotes import PyannotVAD, PyannotDIAR, PyannotOSD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
 from .pipe import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe
-from .milvus import MilvusEnvManager, MilVus
+from .milvus import MilVus, MilvusEnvManager, DataMilVus

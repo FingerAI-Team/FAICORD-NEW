@@ -26,7 +26,6 @@ services:
     command: bash
     networks:
       - milvus_faicord-net
-
 secrets:
   gh_token:
     file: git_token/github_token.txt

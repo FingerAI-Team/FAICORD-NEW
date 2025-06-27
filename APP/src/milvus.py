@@ -198,7 +198,7 @@ class DataMilVus(MilVus):   #  args: (DataProcessor)
     def get_len_data(self, collection):
         self.logger.info(f'Number of entities in collection {collection.name}: {collection.num_entities}')
 
-    def set_search_params(self, query_emb, anns_field='text_emb', expr=None, limit=5, output_fields=None, consistency_level="Strong"):
+    def set_search_params(self, query_emb, anns_field='voice_emb', expr=None, limit=5, output_fields=None, consistency_level="Strong"):
         self.search_params = {
             "data": [query_emb],
             "anns_field": anns_field, 

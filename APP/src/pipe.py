@@ -3,6 +3,7 @@ from .preprocessors import AudioFileProcessor
 from .pyannotes import PyannotDIAR, PyannotVAD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
+from .milvus import DataMilVus
 from intervaltree import Interval, IntervalTree
 from scipy.spatial.distance import cosine
 from collections import defaultdict
@@ -204,10 +205,13 @@ class PostProcessPipe(BasePipeline):
     3. relabeled non-overlapped diar을 이용해 계산한 청크별 화자 고유 임베딩 값 -> 청크별 화자 매핑 딕셔너리 생성 (func. build_label_mapping_dict)
     4. relabeled non-overlapped diar을 이용한 full diar re-labeling (func. apply labels to full diar)
     5. 청크별 화자 매핑 딕셔너리 -> full diar re-labeled 결과에 적용 (func. apply_label_mapping_to_diar)
+
+    * 임베딩 값은 Milvus에 저장해서 탐색하도록 변경 
     '''
     def __init__(self, chunk_offset=300):
         super().__init__(chunk_offset)
         self.wsemb = WSEMB()
+        self.vectordb_manager = DataMilVus()
         self.emb_model = self.wsemb.load_model(model_path='./pretrained_models/voxceleb_resnet221_LM')
         self.knn_cluster = KNNCluster() 
         self.emb_visualizer = EMBVisualizer()
