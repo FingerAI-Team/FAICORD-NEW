@@ -14,4 +14,3 @@ demucs
 seaborn
 intervaltree
 nara-wpe
-pymilvus

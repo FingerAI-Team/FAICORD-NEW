@@ -78,34 +78,38 @@ class NoiseHandler:
             for temp_file in temp_files:   # 임시 파일 삭제
                 if os.path.exists(temp_file):
                     os.unlink(temp_file)
-
+    
     def denoise_audio(self, audio_input, model_type='nsnet'):
         if isinstance(audio_input, str):
             sigIn, fs = sf.read(audio_input)
             audioIn = AudioSegment.from_wav(audio_input)
         else:
             audio_input.seek(0)
-            try:   # raw data 
+            try:  # raw data
                 sigIn, fs = sf.read(audio_input, format="WAV")
-            except:   # AudioSeg
+            except:
                 sigIn, fs = sf.read(audio_input)
             audio_input.seek(0)
             audioIn = AudioSegment.from_file(audio_input, format="wav")
-        
+
         buffer = BytesIO()
         if model_type == 'nsnet':
-            enhancer = NSnet2Enhancer(fs=48000)
+            # ✔️ NSNet2 지원 샘플링레이트 체크
+            if fs not in (16000, 48000):
+                print(f"[INFO] Unsupported sampling rate: {fs} Hz → Resampling to 48000 Hz")
+                sigIn = librosa.resample(sigIn, orig_sr=fs, target_sr=48000)
+                sigIn = sigIn.astype(np.float32)  # 💡 float32로 명시적으로 캐스팅
+                fs = 48000
+            enhancer = NSnet2Enhancer(fs=fs)
             outSig = enhancer(sigIn, fs)
-            # audioOut = enhancer.pcm_16le(audioIn.raw_data)
-            pcm_int16 = np.int16(outSig*32767)
+            pcm_int16 = np.int16(outSig * 32767)
             audio_clean = AudioSegment(
-                # data=audioOut,
                 data=pcm_int16.tobytes(),
-                sample_width=2,         # 16-bit PCM = 2 bytes
-                frame_rate=audioIn.frame_rate,
-                channels=audioIn.channels
+                sample_width=2,  # 16-bit PCM
+                frame_rate=fs,   # 꼭 리샘플된 fs 사용!
+                channels=1       # NSNet2는 mono 입력이 일반적
             )
-        audio_clean.export(buffer, format='wav')   
+        audio_clean.export(buffer, format='wav')
         buffer.seek(0)
         return audio_clean
     
@@ -129,7 +133,6 @@ class NoiseHandler:
         # print(f"[DEBUG] WPE input shape: {audio.shape}")  # (channels, samples)
         deverved_audio = wpe(audio, iterations=iterations, taps=taps, delay=delay)
         deverved_audio = deverved_audio.T  # → (samples, channels)
-
         pcm_int16 = np.int16(deverved_audio * 32767)
         audio_bytes = pcm_int16.tobytes()
         audio_segment = AudioSegment(
