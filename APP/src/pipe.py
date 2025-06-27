@@ -161,7 +161,7 @@ class DIARPipe(BasePipeline):
             non_overlapped_diar = [self.diar_model.remove_overlap(diar_result) for diar_result in filtered_diar]
             return filtered_diar, non_overlapped_diar
 
-    def save_files(self, diar_result, file_name, emb_result=None):
+    def save_chunk_files(self, diar_result, file_name, emb_result=None):
         '''
         save diar result, numpy emb as rttm, npy format for each chunk
         '''
@@ -170,9 +170,30 @@ class DIARPipe(BasePipeline):
             if len(diar_result) > 1: 
                 save_file_name = f"chunk_{idx}_{file_name.split('/')[-1].split('.')[0]}"
             save_rttm_path = './dataset/rttm/' + save_file_name + '.rttm'
-            save_emb_path = './dataset/emb/' + save_file_name + '.npy'
             self.diar_model.save_as_rttm(chunk_diar, output_rttm_path=save_rttm_path, file_name=save_file_name)
-            # self.diar_model.save_as_emb(emb_result[idx], output_emb_path=save_emb_path)
+            # save_emb_path = './dataset/emb/' + save_file_name + '.npy'
+            # self.diar_model.save_as_emb(emb_result[idx], output_emb_path=save_emb_path)        
+
+    def save_merged_rttm(self, diar_result, file_name, chunk_length=300):
+        """
+        chunk-wise diar_result를 offset 적용해 단일 RTTM 파일로 저장
+        - diar_result: List[List[((start, end), label)]], 청크별 다이얼 결과
+        - save_path: 저장 경로 (.rttm)
+        - file_name: rttm 내부에서 참조할 파일명
+        - chunk_length: 청크 단위 시간 (초)
+        """
+        save_file_name = file_name.split('/')[-1].split('.')[0]
+        save_rttm_path = './dataset/rttm/' + save_file_name + '.rttm'
+        with open(save_rttm_path, "w") as f:
+            for chunk_idx, chunk in enumerate(diar_result):
+                offset = chunk_idx * chunk_length
+                for (start, end), speaker in chunk:
+                    abs_start = start + offset
+                    duration = end - start
+                    if speaker == 'filler':
+                        continue
+                    rttm_line = f"SPEAKER {save_file_name} 1 {abs_start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n"
+                    f.write(rttm_line)    
 
 
 class PostProcessPipe(BasePipeline):
@@ -233,9 +254,11 @@ class PostProcessPipe(BasePipeline):
             return f'SPEAKER_{next_id:02d}'
 
         for chunk_idx, emb_array, original_labels, segment_bounds in chunk_emb_array:
+            # print(f"[DEBUG] chunk {chunk_idx} — labels: {original_labels}")
             speaker_to_embs = defaultdict(list)
             for emb, label in zip(emb_array, original_labels):
                 if label == 'UNKNOWN':
+                    print('detected unknown')
                     continue
                 speaker_to_embs[label].append(emb)
             speaker_centroids = {
