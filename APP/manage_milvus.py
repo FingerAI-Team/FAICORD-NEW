@@ -45,7 +45,7 @@ if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
     cli_parser.add_argument('--config_path', type=str, default='./config/')
     cli_parser.add_argument('--config_name', type=str, default='db_config.json')
-    cli_parser.add_argument('--collection_name', type=str, default='congress')
+    cli_parser.add_argument('--collection_name', type=str, default='voice_emb')
     cli_parser.add_argument('--partition_name', type=str, default=None)
     cli_parser.add_argument('--task_name', type=str, default=None)
     cli_args = cli_parser.parse_args()
