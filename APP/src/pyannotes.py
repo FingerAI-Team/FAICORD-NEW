@@ -90,7 +90,6 @@ class PyannotDIAR(Pyannot):
                 start_time = segment.start
                 end_time = segment.end
                 duration = end_time - start_time
-                # if duration >= min_duration:
                 segment_key = (round(start_time, 3), round(end_time, 3), speaker)
                 if segment_key not in seen_segments:
                     diar_result.append([(start_time, end_time), speaker])
@@ -100,7 +99,6 @@ class PyannotDIAR(Pyannot):
             for segment, _, speaker in diarization[0].itertracks(yield_label=True):
                 start_time, end_time = segment.start, segment.end
                 duration = end_time - start_time
-                # if duration >= min_duration:
                 segment_key = (round(start_time, 3), round(end_time, 3), speaker)
                 if segment_key not in seen_segments:
                     diar_result.append([(start_time, end_time), speaker])
@@ -146,7 +144,7 @@ class PyannotDIAR(Pyannot):
         diar_result: List[List[((start, end), speaker)]], chunk 단위 diar 결과
         조건:
             - 화자별 발화 수 <= 2
-            - 또는 평균 발화 길이 < 1.5초
+            - 또는 평균 발화 길이 < 1.5초   -> (또는 -> 그리고로 수정)
         → 해당 화자를 'UNKNOWN'으로 라벨링
         """
         updated_diar_result = []
@@ -158,7 +156,7 @@ class PyannotDIAR(Pyannot):
             speakers_to_unknown = set()
             for speaker, segments in speaker_segments.items():
                 durations = [end - start for (start, end) in segments]
-                if len(segments) < min_segments or (sum(durations) / len(durations)) < min_avg_duration:
+                if len(segments) < min_segments and (sum(durations) / len(durations)) < min_avg_duration:
                     speakers_to_unknown.add(speaker)
             new_diar = []
             for (start, end), speaker in diar:
