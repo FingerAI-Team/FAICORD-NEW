@@ -10,20 +10,10 @@ def main(args):
     with open(os.path.join(args.whisper_config_path, 'generation_config.json')) as f: 
         generation_config = json.load(f)
     
-    whisper_api = os.getenv('WHISPER_API')
-    frontend_pipe = FrontendPipe()
-    vad_pipe = VADPipe()
+    whisper_api = os.getenv('OPENAI_API')
     stt_pipe = STTPipe()
-    
-    frontend_pipe.set_env()
-    vad_pipe.set_env(os.path.join(args.model_config_path, 'pyannote_vad_config.yaml'))
     stt_pipe.set_env(whisper_api=whisper_api, generation_config=generation_config)
-    
-    clean_audio = frontend_pipe.process_audio(args.file_name, chunk_length=300, deverve=True)
-    # frontend_pipe.save_audio(clean_audio, 'frontend-processed.wav')
-    vad_result = vad_pipe.get_vad_timestamp(clean_audio)
-    # print(vad_result)
-    vad_merged = vad_pipe.merge_segments(vad_result, min_length=5, silence_gap=5, min_keep_length=0.5)
+    diar_result = 
     print(vad_merged)
     stt_result = stt_pipe.transcribe_text(args.file_name, vad_result=vad_merged, transcribe_type='api')
     save_file_name = 'stt_origin_vad_' + args.file_name.split('/')[-1].split('.')[0] + '.txt'

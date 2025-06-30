@@ -104,6 +104,7 @@ class VADPipe(BasePipeline):
 class STTPipe(BasePipeline):
     def set_env(self, whisper_api, generation_config):
         self.audio_processor = AudioFileProcessor()
+        print(whisper_api)
         self.stt_model = WhisperSTT(whisper_api, generation_config)
 
     def chunk_audio(self, audio_file, chunk_length=None, start_time=None, end_time=None):

@@ -23,6 +23,7 @@ class WhisperSTT(STTModule):
         self.generation_config = generation_config 
 
     def set_client(self, openai_api):
+        print(openai_api)
         self.openai_client = OpenAI(api_key=openai_api)
     
     def format_timestamp(self, seconds: float) -> str:
