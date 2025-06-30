@@ -1,0 +1,10 @@
+{
+    "num_beams": 7,
+    "condition_on_prev_tokens": false,
+    "temperature": 0.0,
+    "logprob_threshold": -1.0,
+    "no_speech_threshold": 0.5,
+    "language": "ko",
+    "return_timestamps": "word",
+    "return_dict": true
+}
