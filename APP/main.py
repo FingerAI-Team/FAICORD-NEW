@@ -1,6 +1,7 @@
 from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe
 import argparse
 import time
+import json
 import os
 
 
@@ -9,12 +10,16 @@ def main(args):
     Default Setting
     '''
     start = time.time()
+    db_config_name = os.path.join(args.config_path, 'db_config.json')
+    with open(db_config_name) as f:
+        db_config = json.load(f)
+
     vad_config = os.path.join(args.model_config_path, 'pyannote_vad_config.yaml')
     diar_config = os.path.join(args.model_config_path, 'pyannote_diarization_config.yaml')
     frontend_pipe = FrontendPipe()
     vad_pipe = VADPipe(vad_config)
     diar_pipe = DIARPipe(diar_config)
-    postprocess_pipe = PostProcessPipe()
+    postprocess_pipe = PostProcessPipe(db_config)
     
     '''
     Cleanse audio, Get VAD Result, Get Diar Result, Process Diar Result 
@@ -34,6 +39,7 @@ def main(args):
 
 if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
+    cli_parser.add_argument('--config_path', type=str, default='./config/')
     cli_parser.add_argument('--model_config_path', type=str, default='./models')
     cli_parser.add_argument('--file_name', type=str, required=True)
     cli_parser.add_argument('--chunk_length', type=int, default=300)

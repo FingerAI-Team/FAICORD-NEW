@@ -208,10 +208,10 @@ class PostProcessPipe(BasePipeline):
 
     * 임베딩 값은 Milvus에 저장해서 탐색하도록 변경 
     '''
-    def __init__(self, chunk_offset=300):
+    def __init__(self, db_config, chunk_offset=300):
         super().__init__(chunk_offset)
         self.wsemb = WSEMB()
-        self.vectordb_manager = DataMilVus()
+        self.vectordb_manager = DataMilVus(db_config)
         self.emb_model = self.wsemb.load_model(model_path='./pretrained_models/voxceleb_resnet221_LM')
         self.knn_cluster = KNNCluster() 
         self.emb_visualizer = EMBVisualizer()
