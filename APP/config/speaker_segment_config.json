@@ -1,0 +1,46 @@
+{
+  "description": "schema for voice_emb",
+  "collection_name": "voice_emb",
+  "fields": [
+    {
+      "name": "id",
+      "dtype": "VARCHAR",
+      "is_primary": true,
+      "max_length": 50
+    },
+    {
+      "name": "audio_emb",
+      "dtype": "FLOAT_VECTOR",
+      "is_primary": false,
+      "dim": 256
+    },
+    {
+      "name": "time_s",
+      "dtype": "FLOAT",
+      "is_primary": false
+    },
+    {
+        "name": "time_e", 
+        "dtype": "FLOAT", 
+        "is_primary": false
+    },
+    {
+      "name": "speaker_id",
+      "dtype": "VARCHAR",
+      "is_primary": false,
+      "max_length": 30
+    },
+    {
+      "name": "language",
+      "dtype": "VARCHAR",
+      "is_primary": false,
+      "max_length": 20
+    },
+    {
+      "name": "source",
+      "dtype": "VARCHAR",
+      "is_primary": false,
+      "max_length": 200
+    }
+  ]
+}
