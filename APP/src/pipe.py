@@ -217,25 +217,59 @@ class PostProcessPipe(BasePipeline):
         self.emb_visualizer = EMBVisualizer()
               
     def get_chunk_emb_array(self, file_name, diar_result):
-        '''
-        get speaker emb array for each audio chunk 
-        input:
-            - file_name: audio file name 
-            - diar result: diar results of audio chunk, each diar result is consists of [[((start, end), speaker), ((start, end), speaker), ...], [(())]]
-        output:
-            - chunk emb array: (chunk_idx, emb_array, original_labels, segment_bounds)
-                - segment_bounds: (start, end)
-        '''
+        """
+        각 chunk에 대해 speaker embedding을 계산하고 Milvus에 저장
+        Output: chunk_emb_array = (chunk_idx, emb_array, original_labels, segment_bounds)
+        """
         chunk_emb_array = []
+        file_id = file_name.split('/')[-1].split('.')[0]  # 파일명만 추출
+        print(file_id)
         for idx, diar in enumerate(diar_result):
             emb_result = self.wsemb.get_embeddings_from_diar(
-                self.emb_model, file_name, diar, chunk_offset=idx*self.chunk_offset
+                self.emb_model, file_name, diar, chunk_offset=idx * self.chunk_offset
             )
-            emb_array = np.vstack([emb for (_, _, emb) in emb_result])
-            original_labels = [speaker for (_, speaker, _) in emb_result]
-            segments = [(start, end) for ((start, end), _, _) in emb_result]
-            chunk_emb_array.append((idx, emb_array, original_labels, segments))
-        return chunk_emb_array    
+            emb_array = []
+            original_labels = []
+            segments = []
+            insert_data = {
+                "id": [],
+                "audio_emb": [],
+                "time_s": [],
+                "time_e": [],
+                "speaker_id": [],
+                "language": [],
+                "source": []
+            }
+
+            for seg_idx, ((start, end), speaker, emb) in enumerate(emb_result):
+                uid = f"{file_id}_{idx}_{seg_idx}"
+                print(np.shape(emb), len(emb_result))
+                insert_data["id"].append(uid)
+                insert_data["audio_emb"].append(emb.tolist())  # 반드시 list로 변환
+                insert_data["time_s"].append(float(start))
+                insert_data["time_e"].append(float(end))
+                insert_data["speaker_id"].append(str(speaker))
+                insert_data["language"].append("ko")
+                insert_data["source"].append(file_name)
+
+                emb_array.append(emb)
+                original_labels.append(speaker)
+                segments.append((start, end))
+
+            self.vectordb_manager.insert_data(
+                m_data=[
+                    insert_data["id"],
+                    insert_data["audio_emb"],
+                    insert_data["time_s"],
+                    insert_data["time_e"],
+                    insert_data["speaker_id"],
+                    insert_data["language"],
+                    insert_data["source"]
+                ],
+                collection_name="voice_emb"
+            )
+            chunk_emb_array.append((idx, np.vstack(emb_array), original_labels, segments))
+        return chunk_emb_array
 
     def build_label_mapping_dict(self, chunk_emb_array, threshold=0.6):
         '''
