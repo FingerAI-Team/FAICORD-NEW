@@ -70,6 +70,10 @@ class MilVus:
         self.collection_primary_key = collection.primary_field
         self.collection_partitions = collection.partition
         self.num_entities = collection.num_entities
+        print(self.collection_schema)
+        print(self.collection_name)
+        print(self.collection_is_empty)
+        print(self.num_entities)
         
 
 class MilvusEnvManager(MilVus):
