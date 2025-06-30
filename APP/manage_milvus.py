@@ -15,10 +15,10 @@ def main(args):
     if args.task_name == None: 
         ''' Collection, Partition info 조회 ''' 
         print(f'[Info] collection {args.collection_name}')
-        milvus_db.get_collection_info(collection)
+        milvus_db.get_collection_info(args.collection_name)
         print(f'[Info] partition')
-        milvus_db.get_partition_info(collection)
-        print(dict(zip(milvus_db.partition_names, milvus_db.partition_num_entities))) 
+        milvus_db.get_partition_info(args.collection_name)
+        print(dict(zip(milvus_db.partition_names, milvus_db.partition_entities_num))) 
     elif args.task_name == 'create':   # create partition 
         try:
             assert args.partition_name != None, "생성하고자하는 partition 이름을 지정해주세요."
