@@ -9,3 +9,4 @@
 *.png
 /APP/pretrained_models
 /APP/git_token/github_token.txt
+/MILVUS/volumes
