@@ -15,14 +15,9 @@
       "dim": 256
     },
     {
-      "name": "time_s",
+      "name": "chunk_idx",
       "dtype": "FLOAT",
       "is_primary": false
-    },
-    {
-        "name": "time_e", 
-        "dtype": "FLOAT", 
-        "is_primary": false
     },
     {
       "name": "speaker_id",
