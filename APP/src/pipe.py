@@ -141,7 +141,7 @@ class STTPipe(BasePipeline):
                 end_sample = int(end_sec * sample_rate)
                 segment_waveform = waveform[:, start_sample:end_sample]
                 stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
-                print(len(stt_result))
+                # print(len(stt_result))
                 if stt_result != None:
                     text_result = self.stt_model.extract_text(stt_result, text_filter)
                     print(text_result)

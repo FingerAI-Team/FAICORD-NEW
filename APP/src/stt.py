@@ -75,19 +75,20 @@ class WhisperSTT(STTModule):
                 channels=1
             )
         else:
-            # ✅ (2) 문자열 경로, BytesIO, AudioSegment → prepare
             audio_segment = self.prepare_whisper_audio(audio_file_or_tensor)
 
-        # 🔧 공통 처리: AudioSegment를 임시 파일로 저장
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
             audio_segment.export(temp_audio_file.name, format="wav")
             with open(temp_audio_file.name, "rb") as f:
-                transcription = self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    language='ko',
-                    response_format="verbose_json",
-                )
+                try:
+                    transcription = self.openai_client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=f,
+                        language='ko',
+                        response_format="verbose_json",
+                    )
+                except: 
+                    print(f'audio transcript err')
             os.remove(temp_audio_file.name)
         try:
             return transcription.segments
@@ -100,10 +101,20 @@ class WhisperSTT(STTModule):
         filter['temperature'] = 1.0
         filter['no_speech_prob'] = 1.0
         '''
-        if segment.temperature < text_filter['temperature'] and segment.no_speech_prob < text_filter['no_speech_prob']:   
-            segment.text = segment.text.strip()
-            segment.text = self.apply_word_dictionary(segment.text, self.word_dict) 
-        return segment.text
+        if len(segments) == 1: 
+            segment = segments[0]
+            if segment.temperature < text_filter['temperature'] and segment.no_speech_prob < text_filter['no_speech_prob']:   
+                segment.text = segment.text.strip()
+                segment.text = self.apply_word_dictionary(segment.text, self.word_dict)
+            return segment.text 
+        else:
+            text = "" 
+            for segment in segments: 
+                if segment.temperature < text_filter['temperature'] and segment.no_speech_prob < text_filter['no_speech_prob']:   
+                    segment.text = segment.text.strip()
+                    segment.text = self.apply_word_dictionary(segment.text, self.word_dict)
+                    text = text + segment.text + " "
+            return text
 
     def save_as_txt(self, segments, file_name):
         '''
