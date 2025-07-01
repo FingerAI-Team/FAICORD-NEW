@@ -224,18 +224,3 @@ class DataMilVus(MilVus):   #  args: (DataProcessor)
             id_list.append(search_result[0][idx].id)
             distance_list.append(search_result[0][idx].distance)
         return id_list, distance_list
-
-    def decode_search_result(self, search_result):
-        # print(f'ids: {search_result[0][0].id}')
-        # print(f"entity: {search_result[0][0].entity.get('text')}") 
-        texts = [] 
-        ids = []
-        distances = [] 
-        for idx in range(len(search_result[0])):
-            texts.append(search_result[0][idx].entity.get('text')) 
-            ids.append(search_result[0][idx].entity.get('id'))
-            distances.append(search_result[0][idx].entity.get('distance'))
-        return texts
-
-    def rerank_data(self, search_result):
-        raise NotImplementedError("rerank_data method is not implemented yet.")
