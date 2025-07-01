@@ -3,7 +3,6 @@ import argparse
 import json
 import os 
 
-
 def main(args):
     with open(os.path.join(args.config_path, args.config_name)) as f:
         db_args = json.load(f)
@@ -29,7 +28,7 @@ def main(args):
     schema = milvus_db.create_schema(schema_fields, schema_config.get("description", "schema"))
     collection = milvus_db.create_collection(collection_name, schema, shards_num=2)
     milvus_db.get_collection_info(collection_name)
-    milvus_db.create_index(collection, field_name='audio_emb')   # text 필드에 index 생성 
+    milvus_db.create_index(collection, field_name='audio_emb')   # audio_emb 필드에 index 생성 
 
 if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
