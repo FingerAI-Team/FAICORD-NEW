@@ -7,6 +7,7 @@ from abc import abstractmethod
 from pydub import AudioSegment
 from typing import List, Tuple
 from io import BytesIO
+import pandas as pd 
 import tempfile
 
 
@@ -109,6 +110,47 @@ class STTPipe(BasePipeline):
 
     def chunk_audio(self, audio_file, chunk_length=None, start_time=None, end_time=None):
         return self.audio_processor.chunk_audio(audio_file, chunk_length, start_time, end_time)
+
+    def prepare_audio(self, audio_file):
+        return self.stt_model.prepare_whisper_audio(audio_file)
+
+    def read_rttm(self, rttm_file):
+        columns = [
+            'type', 'file_id', 'channel', 'start', 'duration',
+            'ortho', 'stype', 'speaker', 'conf', 'slat'
+        ]
+        df = pd.read_csv(rttm_file, sep=' ', header=None, names=columns, engine='python')
+        df = df[['file_id', 'start', 'duration', 'speaker']]
+        return df
+
+    def transcribe_by_rttm(self, whisper_audio, diar_result, transcribe_type='api'):
+        results = []
+        text_filter = dict()
+        text_filter['temperature'] = 0.8
+        text_filter['no_speech_prob'] = 0.5
+        if transcribe_type == 'api' and diar_result is not None:
+            waveform, sample_rate = self.stt_model.prepare_whisper_audio(whisper_audio)
+            print(f'sample_rate: {sample_rate}')
+            # waveform, sample_rate = whisper_audio  # waveform: Tensor (1, N)
+            for idx, row in diar_result.iterrows():
+                start_sec = row['start']
+                end_sec = row['start'] + row['duration']
+                speaker = row['speaker']
+
+                start_sample = int(start_sec * sample_rate)
+                end_sample = int(end_sec * sample_rate)
+                segment_waveform = waveform[:, start_sample:end_sample]
+                stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
+                print(len(stt_result))
+                if stt_result != None:
+                    text_result = self.stt_model.extract_text(stt_result, text_filter)
+                    print(text_result)
+                results.append({
+                    'speaker': speaker,
+                    'text': text_result
+                })
+        return results
+
 
     def transcribe_text(self, audio_file, vad_result=None, chunk_length=270, transcribe_type='api'):
         '''

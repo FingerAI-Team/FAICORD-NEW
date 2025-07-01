@@ -3,6 +3,7 @@ from pydub import AudioSegment
 from openai import OpenAI
 from datetime import timedelta
 import tempfile
+import torch
 import json 
 import os
 import io 
@@ -23,7 +24,6 @@ class WhisperSTT(STTModule):
         self.generation_config = generation_config 
 
     def set_client(self, openai_api):
-        print(openai_api)
         self.openai_client = OpenAI(api_key=openai_api)
     
     def format_timestamp(self, seconds: float) -> str:
@@ -45,33 +45,57 @@ class WhisperSTT(STTModule):
         elif isinstance(audio_input, io.BytesIO):
             audio_input.seek(0)
             audio = AudioSegment.from_file(audio_input, format="wav")
-        elif isinstance(audio_input, str):     # 파일 경로
+        elif isinstance(audio_input, str):  # 파일 경로
             audio = AudioSegment.from_file(audio_input)
         else:
             raise TypeError("지원되지 않는 오디오 타입입니다.")
-        whisper_audio = audio.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
-        return whisper_audio
+        
+        # Whisper-friendly audio: 16kHz, mono, 2byte
+        audio = audio.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
 
-    def transcribe_text_api(self, audio_file):
+        # → numpy → torch Tensor
+        samples = audio.get_array_of_samples()
+        waveform = torch.tensor(samples, dtype=torch.float32).unsqueeze(0) / 32768.0  # normalize to [-1, 1]
+        return waveform, sample_rate
+
+    def transcribe_text_api(self, audio_file_or_tensor):
         '''
-        transcription.segments: segment.start, segment.end, segment.text, segment.no_speech_prob, segment.seek, segment.temperature, segment.avg_logprob
+        transcription.segments: segment.start, segment.end, segment.text, ...
         '''
-        whisper_audio = self.prepare_whisper_audio(audio_file)
+        # ✅ (1) 이미 Tensor+sample_rate tuple인 경우 (segment audio)
+        if isinstance(audio_file_or_tensor, tuple) and isinstance(audio_file_or_tensor[0], torch.Tensor):
+            waveform, sample_rate = audio_file_or_tensor
+            # waveform: Tensor (1, N), float32
+            # → numpy array → bytes → AudioSegment
+            array = (waveform.squeeze().numpy() * 32767).astype("int16")
+            audio_segment = AudioSegment(
+                array.tobytes(),
+                frame_rate=sample_rate,
+                sample_width=2,
+                channels=1
+            )
+        else:
+            # ✅ (2) 문자열 경로, BytesIO, AudioSegment → prepare
+            audio_segment = self.prepare_whisper_audio(audio_file_or_tensor)
+
+        # 🔧 공통 처리: AudioSegment를 임시 파일로 저장
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
-            whisper_audio.export(temp_audio_file.name, format="wav")
-            with open(temp_audio_file.name, "rb") as audio_file:
+            audio_segment.export(temp_audio_file.name, format="wav")
+            with open(temp_audio_file.name, "rb") as f:
                 transcription = self.openai_client.audio.transcriptions.create(
                     model="whisper-1",
-                    file=audio_file,
+                    file=f,
                     language='ko',
                     response_format="verbose_json",
-                    # timestamp_granularities=["segment"],
                 )
             os.remove(temp_audio_file.name)
-        segments = transcription.segments
-        return segments
+        try:
+            return transcription.segments
+        except:
+            print(f'err: {transcription.segments}')
+            return None 
 
-    def extract_text(self, segment, text_filter=None):
+    def extract_text(self, segments, text_filter=None):
         '''
         filter['temperature'] = 1.0
         filter['no_speech_prob'] = 1.0
