@@ -223,7 +223,6 @@ class PostProcessPipe(BasePipeline):
         """
         chunk_emb_array = []
         file_id = file_name.split('/')[-1].split('.')[0]  # 파일명만 추출
-        print(file_id)
         for idx, diar in enumerate(diar_result):
             emb_result = self.wsemb.get_embeddings_from_diar(
                 self.emb_model, file_name, diar, chunk_offset=idx * self.chunk_offset
@@ -231,43 +230,11 @@ class PostProcessPipe(BasePipeline):
             emb_array = []
             original_labels = []
             segments = []
-            insert_data = {
-                "id": [],
-                "audio_emb": [],
-                "time_s": [],
-                "time_e": [],
-                "speaker_id": [],
-                "language": [],
-                "source": []
-            }
-
             for seg_idx, ((start, end), speaker, emb) in enumerate(emb_result):
-                uid = f"{file_id}_{idx}_{seg_idx}"
-                print(np.shape(emb), len(emb_result))
-                insert_data["id"].append(uid)
-                insert_data["audio_emb"].append(emb.tolist())  # 반드시 list로 변환
-                insert_data["time_s"].append(float(start))
-                insert_data["time_e"].append(float(end))
-                insert_data["speaker_id"].append(str(speaker))
-                insert_data["language"].append("ko")
-                insert_data["source"].append(file_name)
-
+                # print(np.shape(emb), len(emb_result))
                 emb_array.append(emb)
                 original_labels.append(speaker)
                 segments.append((start, end))
-
-            self.vectordb_manager.insert_data(
-                m_data=[
-                    insert_data["id"],
-                    insert_data["audio_emb"],
-                    insert_data["time_s"],
-                    insert_data["time_e"],
-                    insert_data["speaker_id"],
-                    insert_data["language"],
-                    insert_data["source"]
-                ],
-                collection_name="voice_emb"
-            )
             chunk_emb_array.append((idx, np.vstack(emb_array), original_labels, segments))
         return chunk_emb_array
 
@@ -280,7 +247,7 @@ class PostProcessPipe(BasePipeline):
         output:
             - chunkwise_mapping: Dict of chunk_idx → local_to_global speaker label mapping
         '''
-        speaker_registry = {}  # global_label: centroid
+        speaker_registry = {}    # global_label: centroid
         chunkwise_mapping = {}
         def get_next_speaker_name():
             existing_ids = [
@@ -290,14 +257,11 @@ class PostProcessPipe(BasePipeline):
             ]
             next_id = max(existing_ids) + 1 if existing_ids else 0
             return f'SPEAKER_{next_id:02d}'
-
+            
         for chunk_idx, emb_array, original_labels, segment_bounds in chunk_emb_array:
             # print(f"[DEBUG] chunk {chunk_idx} — labels: {original_labels}")
             speaker_to_embs = defaultdict(list)
             for emb, label in zip(emb_array, original_labels):
-                if label == 'UNKNOWN':
-                    print('detected unknown')
-                    continue
                 speaker_to_embs[label].append(emb)
             speaker_centroids = {
                 speaker: np.mean(np.stack(embs), axis=0)
@@ -371,7 +335,7 @@ class PostProcessPipe(BasePipeline):
             relabeled_diar_result.append(relabeled_diar)
         return relabeled_diar_result  
 
-    def apply_labels_to_full_diar(self, full_diar, relabeled_nonoverlap_diar, min_ratio=0.3):
+    def apply_labels_to_full_diar(self, full_diar, nonoverlap_diar, min_ratio=0.3):
         '''
         full_diar[0]: chunk 0 diar    - [((start, end), speaker), ((start, end), speaker), ... ]  
         full_diar[1]: chunk 1 diar    -                         '' 
@@ -384,7 +348,7 @@ class PostProcessPipe(BasePipeline):
                 earliest_speaker = None
                 earliest_start = float('inf')
                 speaker_durations = {}  # 각 speaker의 전체 발화 시간 저장
-                for (rel_start, rel_end), rel_label in relabeled_nonoverlap_diar[idx]:
+                for (rel_start, rel_end), rel_label in nonoverlap_diar[idx]:
                     # 겹치는 경우만 고려
                     overlap_start = max(full_start, rel_start)
                     overlap_end = min(full_end, rel_end)
