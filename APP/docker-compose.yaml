@@ -1,7 +1,7 @@
 services:
   app:
-    container_name: faicord-milvus
-    image: faicord-build:milvus
+    container_name: faicord
+    image: faicord:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,11 +25,11 @@ services:
     tty: true
     command: bash
     networks:
-      - milvus_faicord-net
+      - faicord-net
 
 secrets:
   gh_token:
     file: git_token/github_token.txt
 networks:
-  milvus_faicord-net:
+  faicord-net:
     external: true
