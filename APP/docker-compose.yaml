@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: faicord
     image: faicord-build
     build:
       context: .
@@ -8,7 +9,19 @@ services:
         - gh_token
     secrets:
       - gh_token
-
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - .:/faicord 
+    stdin_open: true
+    tty: true
+    command: bash
 secrets:
   gh_token:
     file: token/github_token.txt
