@@ -4,6 +4,7 @@ from .pyannotes import PyannotDIAR, PyannotVAD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
 from .milvus import DataMilVus
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from intervaltree import Interval, IntervalTree
 from scipy.spatial.distance import cosine
 from collections import defaultdict
@@ -34,8 +35,32 @@ class FrontendPipe(BasePipeline):
         self.noise_handler = NoiseHandler()
         self.audio_file_processor = AudioFileProcessor()
 
+    def _process_chunk(self, chunk, deverve, fade_ms):
+        chunk_io = BytesIO()
+        chunk.export(chunk_io, format='wav')
+        chunk_io.seek(0)
+        denoised = self.noise_handler.denoise_audio(chunk_io)
+        if deverve:
+            clean_chunk = self.noise_handler.deverve_audio(denoised)
+            clean_chunk.seek(0)
+            seg = self.audio_file_processor.audiofile_to_AudioSeg(clean_chunk)
+        else:
+            seg = self.audio_file_processor.audiofile_to_AudioSeg(denoised)
+        return seg
+
     def process_audio(self, audio_file, fade_ms=50, chunk_length=300, deverve=False):
-        '''
+        audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file)
+        chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
+        print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            processed_chunks = list(executor.map(
+                lambda c: self._process_chunk(c, deverve, fade_ms), chunks
+            ))
+        clean_audio = self.audio_file_processor.concat_chunk(processed_chunks)
+        return clean_audio
+    
+    '''
+    def process_audio(self, audio_file, fade_ms=50, chunk_length=300, deverve=False):
         audio processing function 
         1. chunk audio
         2. denoise audio 
@@ -47,7 +72,6 @@ class FrontendPipe(BasePipeline):
             - chunk_length: audio chunk length 
         output: 
             - processed audio 
-        '''
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
         print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
@@ -70,6 +94,7 @@ class FrontendPipe(BasePipeline):
         clean_audio = self.audio_file_processor.concat_chunk(processed_chunks)
         # normalized_audio = self.voice_enhancer.normalize_audio_lufs(clean_audio)
         return clean_audio
+    '''
 
     def save_audio(self, audio_file, file_name=None):
         self.audio_file_processor.save_audio(audio_file, file_name=file_name)
@@ -106,11 +131,37 @@ class DIARPipe(BasePipeline):
         self.audio_file_processor = AudioFileProcessor()
         self.diar_model = PyannotDIAR()
         self.diar_config = config 
-        
+
+    def _process_chunk(self, idx, chunk, diar_pipe, num_speakers, return_embeddings):
+        with tempfile.NamedTemporaryFile(suffix=".wav") as temp_audio:
+            chunk.export(temp_audio.name, format="wav")
+            diar_result, emb = self.diar_model.get_diar_result(
+                diar_pipe, temp_audio.name,
+                num_speakers=num_speakers,
+                return_embeddings=return_embeddings
+            )
+        return idx, diar_result, emb
+    
     def get_diar(self, audio_file, num_speakers=None, return_embeddings=False):
-        '''
+        diar_pipe = self.diar_model.load_pipeline_from_pretrained(self.diar_config)
+        audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
+        chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=self.chunk_offset)
+        results = [None] * len(chunks)
+        emb_results = [None] * len(chunks)
+        with ThreadPoolExecutor(max_workers=4) as executor:  # 적절히 조절
+            futures = [
+                executor.submit(self._process_chunk, idx, chunk, diar_pipe, num_speakers, return_embeddings)
+                for idx, chunk in enumerate(chunks)
+            ]
+            for future in as_completed(futures):
+                idx, diar_result, emb = future.result()
+                results[idx] = diar_result
+                emb_results[idx] = emb
+        return results, emb_results
+
+    '''        
+    def get_diar(self, audio_file, num_speakers=None, return_embeddings=False):
         audio_file: AudioSeg
-        '''
         diar_pipe = self.diar_model.load_pipeline_from_pretrained(self.diar_config)
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=self.chunk_offset)
@@ -122,6 +173,7 @@ class DIARPipe(BasePipeline):
             results.append(diar_result)
             emb_results.append(emb)
         return results, emb_results 
+    '''
 
     def apply_vad(self, vad_result, diar_result):
         '''
