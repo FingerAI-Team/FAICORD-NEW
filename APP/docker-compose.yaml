@@ -26,7 +26,6 @@ services:
     command: bash
     networks:
       - faicord-net
-
 secrets:
   gh_token:
     file: git_token/github_token.txt
