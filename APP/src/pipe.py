@@ -238,7 +238,7 @@ class STTPipe(BasePipeline):
                 # print(len(stt_result))
                 if stt_result != None:
                     text_result = self.stt_model.extract_text(stt_result, text_filter)
-                    # print(text_result)
+                    # print(text_result) 
                 results.append({
                     'speaker': speaker,
                     'text': text_result
