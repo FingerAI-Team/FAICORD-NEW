@@ -3,7 +3,7 @@ from .preprocessors import AudioFileProcessor
 from .pyannotes import PyannotDIAR, PyannotVAD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
-from .milvus import DataMilVus
+from .stt import WhisperSTT
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from intervaltree import Interval, IntervalTree
 from scipy.spatial.distance import cosine
@@ -12,6 +12,7 @@ from abc import abstractmethod
 from pydub import AudioSegment
 from io import BytesIO
 import numpy as np
+import pandas as pd
 import tempfile
 import torch
 import time 
@@ -58,43 +59,6 @@ class FrontendPipe(BasePipeline):
             ))
         clean_audio = self.audio_file_processor.concat_chunk(processed_chunks)
         return clean_audio
-    
-    '''
-    def process_audio(self, audio_file, fade_ms=50, chunk_length=300, deverve=False):
-        audio processing function 
-        1. chunk audio
-        2. denoise audio 
-        3. deverve audio
-        4. concat audio 
-        input:
-            - audio_file: .wav audio file 
-            - fade_ms: fade_ms for fade_in, fade_out in audio_file 
-            - chunk_length: audio chunk length 
-        output: 
-            - processed audio 
-        audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
-        chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
-        print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
-        processed_chunks = []
-        for idx, chunk in enumerate(chunks):
-            chunk_io = BytesIO()
-            chunk.export(chunk_io, format='wav')
-            chunk_io.seek(0)
-            denoised = self.noise_handler.denoise_audio(chunk_io)
-            # print(f"[DEBUG] Denoised chunk duration: {len(chunk) / 1000} sec")
-            if deverve == True:             
-                clean_chunk = self.noise_handler.deverve_audio(denoised)
-                clean_chunk.seek(0)
-                seg = self.audio_file_processor.audiofile_to_AudioSeg(clean_chunk)
-                # seg = seg.fade_in(fade_ms).fade_out(fade_ms)
-            else:
-                seg = self.audio_file_processor.audiofile_to_AudioSeg(denoised)
-                # seg = seg.fade_in(fade_ms).fade_out(fade_ms)
-            processed_chunks.append(seg)
-        clean_audio = self.audio_file_processor.concat_chunk(processed_chunks)
-        # normalized_audio = self.voice_enhancer.normalize_audio_lufs(clean_audio)
-        return clean_audio
-    '''
 
     def save_audio(self, audio_file, file_name=None):
         self.audio_file_processor.save_audio(audio_file, file_name=file_name)
@@ -131,7 +95,7 @@ class DIARPipe(BasePipeline):
         self.audio_file_processor = AudioFileProcessor()
         self.diar_model = PyannotDIAR()
         self.diar_config = config 
-
+        
     def _process_chunk(self, idx, chunk, diar_pipe, num_speakers, return_embeddings):
         with tempfile.NamedTemporaryFile(suffix=".wav") as temp_audio:
             chunk.export(temp_audio.name, format="wav")
@@ -158,22 +122,6 @@ class DIARPipe(BasePipeline):
                 results[idx] = diar_result
                 emb_results[idx] = emb
         return results, emb_results
-
-    '''        
-    def get_diar(self, audio_file, num_speakers=None, return_embeddings=False):
-        audio_file: AudioSeg
-        diar_pipe = self.diar_model.load_pipeline_from_pretrained(self.diar_config)
-        audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
-        chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=self.chunk_offset)
-        results = []; emb_results = []
-        for idx, chunk in enumerate(chunks):
-            with tempfile.NamedTemporaryFile(suffix=".wav") as temp_audio:
-                chunk.export(temp_audio.name, format="wav")
-                diar_result, emb = self.diar_model.get_diar_result(diar_pipe, temp_audio.name, num_speakers=num_speakers, return_embeddings=return_embeddings)
-            results.append(diar_result)
-            emb_results.append(emb)
-        return results, emb_results 
-    '''
 
     def apply_vad(self, vad_result, diar_result):
         '''
@@ -248,6 +196,95 @@ class DIARPipe(BasePipeline):
                     rttm_line = f"SPEAKER {save_file_name} 1 {abs_start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n"
                     f.write(rttm_line)    
 
+class STTPipe(BasePipeline):
+    def __init__(self, whisper_api, generation_config):
+        super().__init__()
+        self.audio_processor = AudioFileProcessor()
+        self.stt_model = WhisperSTT(whisper_api, generation_config)
+
+    def chunk_audio(self, audio_file, chunk_length=None, start_time=None, end_time=None):
+        return self.audio_processor.chunk_audio(audio_file, chunk_length, start_time, end_time)
+
+    def prepare_audio(self, audio_file):
+        return self.stt_model.prepare_whisper_audio(audio_file)
+
+    def read_rttm(self, rttm_file):
+        columns = [
+            'type', 'file_id', 'channel', 'start', 'duration',
+            'ortho', 'stype', 'speaker', 'conf', 'slat'
+        ]
+        df = pd.read_csv(rttm_file, sep=' ', header=None, names=columns, engine='python')
+        df = df[['file_id', 'start', 'duration', 'speaker']]
+        return df
+
+    def transcribe_by_rttm(self, whisper_audio, diar_result, transcribe_type='api'):
+        results = []
+        text_filter = dict()
+        text_filter['temperature'] = 0.8
+        text_filter['no_speech_prob'] = 0.5
+        if transcribe_type == 'api' and diar_result is not None:
+            waveform, sample_rate = self.stt_model.prepare_whisper_audio(whisper_audio)
+            print(f'sample_rate: {sample_rate}')
+            # waveform, sample_rate = whisper_audio  # waveform: Tensor (1, N)
+            for idx, row in diar_result.iterrows():
+                start_sec = row['start']
+                end_sec = row['start'] + row['duration']
+                speaker = row['speaker']
+
+                start_sample = int(start_sec * sample_rate)
+                end_sample = int(end_sec * sample_rate)
+                segment_waveform = waveform[:, start_sample:end_sample]
+                stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
+                # print(len(stt_result))
+                if stt_result != None:
+                    text_result = self.stt_model.extract_text(stt_result, text_filter)
+                    print(text_result)
+                results.append({
+                    'speaker': speaker,
+                    'text': text_result
+                })
+        return results
+
+    def extract_only_text(self, segments):
+        '''
+        input: segments 
+        output: text
+        '''
+        texts = "" 
+        for seg in segments: 
+            texts += seg.text + " "
+        return texts
+
+    def merge_consecutive_same_speaker(self, df):
+        merged = []
+        df = df.sort_values('start').reset_index(drop=True)
+
+        cur_start = df.loc[0, 'start']
+        cur_end = cur_start + df.loc[0, 'duration']
+        cur_speaker = df.loc[0, 'speaker']
+        file_id = df.loc[0, 'file_id']
+        for i in range(1, len(df)):
+            row = df.loc[i]
+            start = row['start']
+            end = start + row['duration']
+            speaker = row['speaker']
+            if speaker == cur_speaker:
+                # 연속된 동일 화자면 확장
+                cur_end = end
+            else:
+                # 다른 화자면 지금까지 병합한 것 저장
+                merged.append([file_id, round(cur_start, 6), round(cur_end - cur_start, 6), cur_speaker])
+                # 다음 화자로 초기화
+                cur_start = start
+                cur_end = end
+                cur_speaker = speaker
+        # 마지막 화자 블록 저장
+        merged.append([
+            file_id, round(cur_start, 6), round(cur_end - cur_start, 6), cur_speaker
+        ])
+        return pd.DataFrame(merged, columns=[
+            'file_id', 'start', 'duration', 'speaker'
+        ])
 
 class PostProcessPipe(BasePipeline):
     '''
@@ -257,38 +294,34 @@ class PostProcessPipe(BasePipeline):
     3. relabeled non-overlapped diar을 이용해 계산한 청크별 화자 고유 임베딩 값 -> 청크별 화자 매핑 딕셔너리 생성 (func. build_label_mapping_dict)
     4. relabeled non-overlapped diar을 이용한 full diar re-labeling (func. apply labels to full diar)
     5. 청크별 화자 매핑 딕셔너리 -> full diar re-labeled 결과에 적용 (func. apply_label_mapping_to_diar)
-
-    * 임베딩 값은 Milvus에 저장해서 탐색하도록 변경 
     '''
-    def __init__(self, db_config, chunk_offset=300):
+    def __init__(self, chunk_offset=300):
         super().__init__(chunk_offset)
         self.wsemb = WSEMB()
-        self.vectordb_manager = DataMilVus(db_config)
         self.emb_model = self.wsemb.load_model(model_path='./pretrained_models/voxceleb_resnet221_LM')
         self.knn_cluster = KNNCluster() 
         self.emb_visualizer = EMBVisualizer()
               
     def get_chunk_emb_array(self, file_name, diar_result):
-        """
-        각 chunk에 대해 speaker embedding을 계산하고 Milvus에 저장
-        Output: chunk_emb_array = (chunk_idx, emb_array, original_labels, segment_bounds)
-        """
+        '''
+        get speaker emb array for each audio chunk 
+        input:
+            - file_name: audio file name 
+            - diar result: diar results of audio chunk, each diar result is consists of [[((start, end), speaker), ((start, end), speaker), ...], [(())]]
+        output:
+            - chunk emb array: (chunk_idx, emb_array, original_labels, segment_bounds)
+                - segment_bounds: (start, end)
+        '''
         chunk_emb_array = []
-        file_id = file_name.split('/')[-1].split('.')[0]  # 파일명만 추출
         for idx, diar in enumerate(diar_result):
             emb_result = self.wsemb.get_embeddings_from_diar(
-                self.emb_model, file_name, diar, chunk_offset=idx * self.chunk_offset
+                self.emb_model, file_name, diar, chunk_offset=idx*self.chunk_offset
             )
-            emb_array = []
-            original_labels = []
-            segments = []
-            for seg_idx, ((start, end), speaker, emb) in enumerate(emb_result):
-                # print(np.shape(emb), len(emb_result))
-                emb_array.append(emb)
-                original_labels.append(speaker)
-                segments.append((start, end))
-            chunk_emb_array.append((idx, np.vstack(emb_array), original_labels, segments))
-        return chunk_emb_array
+            emb_array = np.vstack([emb for (_, _, emb) in emb_result])
+            original_labels = [speaker for (_, speaker, _) in emb_result]
+            segments = [(start, end) for ((start, end), _, _) in emb_result]
+            chunk_emb_array.append((idx, emb_array, original_labels, segments))
+        return chunk_emb_array    
 
     def build_label_mapping_dict(self, chunk_emb_array, threshold=0.6):
         '''
@@ -299,7 +332,7 @@ class PostProcessPipe(BasePipeline):
         output:
             - chunkwise_mapping: Dict of chunk_idx → local_to_global speaker label mapping
         '''
-        speaker_registry = {}    # global_label: centroid
+        speaker_registry = {}  # global_label: centroid
         chunkwise_mapping = {}
         def get_next_speaker_name():
             existing_ids = [
@@ -309,11 +342,14 @@ class PostProcessPipe(BasePipeline):
             ]
             next_id = max(existing_ids) + 1 if existing_ids else 0
             return f'SPEAKER_{next_id:02d}'
-            
+
         for chunk_idx, emb_array, original_labels, segment_bounds in chunk_emb_array:
             # print(f"[DEBUG] chunk {chunk_idx} — labels: {original_labels}")
             speaker_to_embs = defaultdict(list)
             for emb, label in zip(emb_array, original_labels):
+                if label == 'UNKNOWN':
+                    print('detected unknown')
+                    continue
                 speaker_to_embs[label].append(emb)
             speaker_centroids = {
                 speaker: np.mean(np.stack(embs), axis=0)
@@ -379,15 +415,10 @@ class PostProcessPipe(BasePipeline):
                     emb_idx += 1
                 else:
                     relabeled_diar.append(segment)
-            '''
-            self.emb_visualizer.pca_and_plot(emb_array, labels=original_labels, file_path='./dataset/img/pca',
-                                            title=f"Wespeaker Embeddings_{audio_file_name}_{idx} (PCA 2D)")
-            self.emb_visualizer.tsne_and_plot(emb_array, labels=original_labels, file_path='./dataset/img/t-sne',
-                                            title=f"Wespeaker Embeddings_{audio_file_name}_{idx} (tsne 2D)")'''
             relabeled_diar_result.append(relabeled_diar)
         return relabeled_diar_result  
 
-    def apply_labels_to_full_diar(self, full_diar, nonoverlap_diar, min_ratio=0.3):
+    def apply_labels_to_full_diar(self, full_diar, relabeled_nonoverlap_diar, min_ratio=0.3):
         '''
         full_diar[0]: chunk 0 diar    - [((start, end), speaker), ((start, end), speaker), ... ]  
         full_diar[1]: chunk 1 diar    -                         '' 
@@ -400,7 +431,7 @@ class PostProcessPipe(BasePipeline):
                 earliest_speaker = None
                 earliest_start = float('inf')
                 speaker_durations = {}  # 각 speaker의 전체 발화 시간 저장
-                for (rel_start, rel_end), rel_label in nonoverlap_diar[idx]:
+                for (rel_start, rel_end), rel_label in relabeled_nonoverlap_diar[idx]:
                     # 겹치는 경우만 고려
                     overlap_start = max(full_start, rel_start)
                     overlap_end = min(full_end, rel_end)
@@ -412,7 +443,6 @@ class PostProcessPipe(BasePipeline):
                         if rel_start < earliest_start:
                             earliest_start = rel_start
                             earliest_speaker = rel_label
-
                 if earliest_speaker is not None:   # 가장 많이 겹친 사람 찾기
                     early_duration = speaker_durations.get(earliest_speaker, 0)
                     dominant_label = max(overlap_segments, key=lambda x: x[0])[1]

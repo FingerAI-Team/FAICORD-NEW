@@ -62,7 +62,6 @@ class WhisperSTT(STTModule):
         '''
         transcription.segments: segment.start, segment.end, segment.text, ...
         '''
-        # ✅ (1) 이미 Tensor+sample_rate tuple인 경우 (segment audio)
         if isinstance(audio_file_or_tensor, tuple) and isinstance(audio_file_or_tensor[0], torch.Tensor):
             waveform, sample_rate = audio_file_or_tensor
             # waveform: Tensor (1, N), float32
@@ -76,7 +75,6 @@ class WhisperSTT(STTModule):
             )
         else:
             audio_segment = self.prepare_whisper_audio(audio_file_or_tensor)
-
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
             audio_segment.export(temp_audio_file.name, format="wav")
             with open(temp_audio_file.name, "rb") as f:
@@ -93,7 +91,7 @@ class WhisperSTT(STTModule):
         try:
             return transcription.segments
         except:
-            print(f'err: {transcription.segments}')
+            print(f'err occured')
             return None 
 
     def extract_text(self, segments, text_filter=None):
