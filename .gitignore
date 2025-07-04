@@ -11,3 +11,5 @@
 /APP/git_token/github_token.txt
 /APP/dataset
 /MILVUS/volumes
+/APP/src/wespeaker
+/APP/src/nsnet2_denoiser
