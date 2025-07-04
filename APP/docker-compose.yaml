@@ -5,10 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      secrets:
-        - gh_token
-    secrets:
-      - gh_token
     runtime: nvidia
     deploy:
       resources:
@@ -26,9 +22,6 @@ services:
     command: bash
     networks:
       - faicord-net
-secrets:
-  gh_token:
-    file: git_token/github_token.txt
 networks:
   faicord-net:
     external: true
