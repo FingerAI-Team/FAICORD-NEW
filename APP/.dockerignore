@@ -1,9 +1,6 @@
 # 환경변수 파일 
 .env
 
-# token
-./git_token/github_token.txt
-
 # log 파일 
 *.log
 
@@ -11,3 +8,10 @@
 ./dataset
 ./models 
 ./pretrained_models 
+./src/wespeaker
+./src/nsnet2_denoiser
+
+# 기타 일반적으로 제외하는 항목
+__pycache__/
+*.pyc
+.DS_Store
