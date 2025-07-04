@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import torchaudio
-import wespeaker
 import random
 import torch
 import os 
@@ -109,10 +108,8 @@ class WSEMB(BaseEMB):
         super().__init__()
     
     def load_model(self, model_path=None, language='english'):
-        if model_path == None: 
-            model = wespeaker.load_model(language)
-        else:
-            model = wespeaker.load_model_local(model_path)
+        from .wespeaker.cli.speaker import load_model_local
+        model = load_model_local(model_path)
         model.set_device(self.device)
         return model
 

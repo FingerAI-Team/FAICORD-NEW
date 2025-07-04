@@ -1,5 +1,5 @@
 from pydub.effects import high_pass_filter, low_pass_filter
-from nsnet2_denoiser import NSnet2Enhancer
+from .nsnet2_denoiser import NSnet2Enhancer
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 from pydub import AudioSegment
