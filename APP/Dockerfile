@@ -6,19 +6,48 @@
 FROM python:3.12-slim-bullseye AS builder
 WORKDIR /app
 
-# 필수 도구만 설치
-RUN apt-get update && apt-get install -y --no-install-recommends python3-venv build-essential git locales ffmpeg wget && \
-    python -m venv /opt/venv
+# --- Builder Stage ---
+RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://security.debian.org/debian-security bullseye-security main" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3-venv \
+        build-essential \
+        git \
+        locales \
+        ffmpeg \
+        wget \
+        ca-certificates \
+        curl \
+        gnupg && \
+    python -m venv /opt/venv && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 
-# --- Inference image ---
+# --- Inference Stage ---
 FROM python:3.12-slim-bullseye
-ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /faicord
 
-COPY --from=builder /opt/venv /opt/venv
-RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg && \
+RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://security.debian.org/debian-security bullseye-security main" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3-venv \
+        build-essential \
+        git \
+        locales \
+        ffmpeg \
+        wget \
+        ca-certificates \
+        curl \
+        gnupg && \
+    python -m venv /opt/venv && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2. 가상환경 복사 및 환경 설정
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 CMD ["sleep", "infinity"]
