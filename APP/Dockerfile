@@ -23,6 +23,9 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
     python -m venv /opt/venv && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 
