@@ -12,3 +12,4 @@
 *.meta
 /MILVUS/volumes
 /APP/dataset/stt
+/APP/src/wespeaker
