@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.4
 # Dockerfile for FAICORD
 # write by Jaedong, Oh (2025.05.18)
+## Update by Jaedong, Oh (2025.07.04)
 
 FROM python:3.12-slim-bullseye AS builder
 WORKDIR /app
@@ -24,15 +25,6 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
 
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
-
-RUN --mount=type=secret,id=gh_token \
-    git clone https://$(cat /run/secrets/gh_token)@github.com/Jaedong95/nsnet2-denoiser.git && \
-    cd nsnet2-denoiser && \
-    pip install .
-
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install git+https://github.com/wenet-e2e/wespeaker.git
 
 # --- Inference Stage ---
 FROM python:3.12-slim-bullseye
