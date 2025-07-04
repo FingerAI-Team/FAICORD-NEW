@@ -25,6 +25,8 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
 
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
 
 # --- Inference Stage ---
 FROM python:3.12-slim-bullseye
