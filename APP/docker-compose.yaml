@@ -1,14 +1,10 @@
 services:
   app:
-    container_name: faicord
-    image: faicord-build
+    container_name: faicord-nonvmilus
+    image: faicord:nonmilvus
     build:
       context: .
       dockerfile: Dockerfile
-      secrets:
-        - gh_token
-    secrets:
-      - gh_token
     runtime: nvidia
     deploy:
       resources:
@@ -22,6 +18,3 @@ services:
     stdin_open: true
     tty: true
     command: bash
-secrets:
-  gh_token:
-    file: token/github_token.txt
