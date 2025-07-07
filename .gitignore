@@ -5,10 +5,8 @@
 *.bin
 *.npy
 *.rttm
-*.txt
 *.png
 /APP/pretrained_models
-/APP/git_token/github_token.txt
 *.meta
 /MILVUS/volumes
 /APP/dataset/stt
