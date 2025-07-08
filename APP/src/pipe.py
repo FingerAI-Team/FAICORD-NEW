@@ -4,6 +4,7 @@ from .pyannotes import PyannotDIAR, PyannotVAD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
 from .stt import WhisperSTT
+from .llms import LLMOpenAI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from intervaltree import Interval, IntervalTree
 from scipy.spatial.distance import cosine
@@ -258,7 +259,6 @@ class STTPipe(BasePipeline):
     def merge_consecutive_same_speaker(self, df):
         merged = []
         df = df.sort_values('start').reset_index(drop=True)
-
         cur_start = df.loc[0, 'start']
         cur_end = cur_start + df.loc[0, 'duration']
         cur_speaker = df.loc[0, 'speaker']
@@ -285,6 +285,37 @@ class STTPipe(BasePipeline):
         return pd.DataFrame(merged, columns=[
             'file_id', 'start', 'duration', 'speaker'
         ])
+
+
+class SummaryPipe(BasePipeline):
+    '''
+    회의록 요약 파이프라인
+    '''
+    def __init__(self, config, api_key):
+        super().__init__()
+        self.config = config
+        self.api_key = api_key
+
+    def set_openai_client(self):
+        openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
+        return openai_summary_model
+
+    def summarize(self, summary_model, text):
+        '''
+        회의록 요약
+        input:
+            - text: 회의록 텍스트
+            - file_name: 파일 이름 (선택적)
+        output:
+            - summary: 요약된 텍스트
+        '''
+        summary_model.set_generation_config()
+        summary_model.set_summary_guideline()
+        print('', end='\n\n')
+        print(summary_model.system_role, end='\n\n')
+        prompt_template = summary_model.set_prompt_template(text)
+        return summary_model.get_response(prompt_template, role=summary_model.system_role) #, sub_role=summary_model.sub_role)        
+        
 
 class PostProcessPipe(BasePipeline):
     '''
