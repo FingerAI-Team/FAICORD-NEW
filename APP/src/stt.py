@@ -3,6 +3,7 @@ from pydub import AudioSegment
 from openai import OpenAI
 from datetime import timedelta
 import tempfile
+import base64
 import torch
 import json 
 import os
