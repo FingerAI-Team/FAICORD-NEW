@@ -311,10 +311,10 @@ class SummaryPipe(BasePipeline):
         '''
         summary_model.set_generation_config()
         summary_model.set_summary_guideline()
-        print('', end='\n\n')
-        print(summary_model.system_role, end='\n\n')
+        # print('', end='\n\n')
+        # print(summary_model.system_role, end='\n\n')
         prompt_template = summary_model.set_prompt_template(text)
-        return summary_model.get_response(prompt_template, role=summary_model.system_role) #, sub_role=summary_model.sub_role)        
+        return summary_model.get_response(prompt_template, role=summary_model.system_role, sub_role=summary_model.sub_role)        
         
 
 class PostProcessPipe(BasePipeline):
