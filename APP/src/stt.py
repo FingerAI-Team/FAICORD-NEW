@@ -53,8 +53,6 @@ class WhisperSTT(STTModule):
         
         # Whisper-friendly audio: 16kHz, mono, 2byte
         audio = audio.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
-
-        # → numpy → torch Tensor
         samples = audio.get_array_of_samples()
         waveform = torch.tensor(samples, dtype=torch.float32).unsqueeze(0) / 32768.0  # normalize to [-1, 1]
         return waveform, sample_rate
