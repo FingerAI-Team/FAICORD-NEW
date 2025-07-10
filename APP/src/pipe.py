@@ -185,8 +185,7 @@ class DIARPipe(BasePipeline):
         - chunk_length: 청크 단위 시간 (초)
         """
         save_file_name = file_name.split('/')[-1].split('.')[0]
-        save_rttm_path = './dataset/rttm/' + save_file_name + '.rttm'
-        with open(save_rttm_path, "w") as f:
+        with open(file_name, "w") as f:
             for chunk_idx, chunk in enumerate(diar_result):
                 offset = chunk_idx * chunk_length
                 for (start, end), speaker in chunk:
