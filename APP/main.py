@@ -22,11 +22,11 @@ def main(args):
     vad_pipe = VADPipe(vad_config)
     diar_pipe = DIARPipe(diar_config)
     postprocess_pipe = PostProcessPipe()
-    summary_pipe = SummaryPipe(config=generation_config, api_key=os.getenv('OPENAI_API'))
-    openai_summary_model = summary_pipe.set_openai_client()
     rttm_file = args.file_name.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
     whisper_api = os.getenv('OPENAI_API')
     stt_pipe = STTPipe(whisper_api=whisper_api, generation_config=generation_config)
+    summary_pipe = SummaryPipe(config=generation_config, api_key=os.getenv('OPENAI_API'))
+    openai_summary_model = summary_pipe.set_openai_client()
     
     '''
     Cleanse audio, Get VAD Result, Get Diar Result, Process Diar Result 
