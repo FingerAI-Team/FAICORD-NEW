@@ -1,8 +1,9 @@
-from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe
+from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe
 from flask import Flask, send_file, request, jsonify, Response
 from dotenv import load_dotenv
 import tempfile
 import requests
+import markdown
 import logging
 import time
 import json
@@ -58,7 +59,7 @@ def process_audio():
         print(f'Summarize Done !: {time.time() - start}초')
         
         markdown_text = summary_pipe.convert_minutes_to_markdown(summary_result)
-        save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '_summary.html'    
+        save_file_name = 'faicord_' + audio_file.split('/')[-1].split('.')[0] + '_summary.html'    
         html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
         with open(os.path.join('./dataset/summary/', save_file_name), "w", encoding="utf-8") as f:
             f.write(html_text)
