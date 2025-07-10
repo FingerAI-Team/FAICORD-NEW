@@ -314,7 +314,28 @@ class SummaryPipe(BasePipeline):
         # print(summary_model.system_role, end='\n\n')
         prompt_template = summary_model.set_prompt_template(text)
         return summary_model.get_response(prompt_template, role=summary_model.system_role, sub_role=summary_model.sub_role)        
-        
+
+    def convert_minutes_to_markdown(self, raw_text: str) -> str:
+        lines = raw_text.strip().split('\n')
+        md_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                md_lines.append('')
+            elif line.startswith('## '):   # 예: ## 안건
+                md_lines.append(f'# {line[3:].strip()}')
+            elif line.startswith('### '):   # 예: ### 안건 1:
+                md_lines.append(f'## {line[4:].strip()}')
+            elif line.startswith('- '):   # Bullet point
+                md_lines.append(f'- {line[2:].strip()}')
+            elif line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.startswith('4.') or line.startswith('5.'):
+                md_lines.append(f'{line.strip()}')   # 번호 붙은 항목은 그대로
+            elif line.startswith('**') and '**' in line[2:]:   # 발언자 라인
+                md_lines.append(f'- {line}')
+            else:
+                md_lines.append(line)
+        return '\n'.join(md_lines)    
+
 
 class PostProcessPipe(BasePipeline):
     '''
