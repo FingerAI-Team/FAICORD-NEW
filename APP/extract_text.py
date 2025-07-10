@@ -20,4 +20,4 @@ if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
     cli_parser.add_argument('--file_name', type=str, required=True)
     cli_args = cli_parser.parse_args()
-    main(cli_args)  # file_name should be passed as an argument
+    main(cli_args)    
