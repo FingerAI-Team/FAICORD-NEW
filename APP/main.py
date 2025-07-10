@@ -40,9 +40,9 @@ def main(args):
     # print(label_mapping_dict)
     full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
     final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-    diar_pipe.save_merged_rttm(final_diar, file_name=args.file_name)
-    print(f'Diarization Done !: {time.time() - start}초')
     rttm_file = args.file_name.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
+    diar_pipe.save_merged_rttm(final_diar, file_name=rttm_file)
+    print(f'Diarization Done !: {time.time() - start}초')
     diar_result = stt_pipe.read_rttm(rttm_file)
     stt_result = stt_pipe.transcribe_by_rttm(args.file_name, diar_result)
     save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '.json'
