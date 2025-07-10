@@ -21,6 +21,8 @@ with open('./config/generation_config.json') as f:
     generation_config = json.load(f)
 whisper_api = os.getenv('OPENAI_API')
 stt_pipe = STTPipe(whisper_api=whisper_api, generation_config=generation_config)
+summary_pipe = SummaryPipe(config=generation_config, api_key=os.getenv('OPENAI_API'))
+openai_summary_model = summary_pipe.set_openai_client()
 
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
@@ -52,6 +54,14 @@ def process_audio():
         rttm_file = tmp_path.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
         diar_result = stt_pipe.read_rttm(rttm_file)
         stt_result = stt_pipe.transcribe_by_rttm(tmp_path, diar_result)
+        summary_result = summary_pipe.summarize(openai_summary_model, stt_result) 
+        print(f'Summarize Done !: {time.time() - start}초')
+        
+        markdown_text = summary_pipe.convert_minutes_to_markdown(summary_result)
+        save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '_summary.html'    
+        html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
+        with open(os.path.join('./dataset/summary/', save_file_name), "w", encoding="utf-8") as f:
+            f.write(html_text)
         return jsonify({'status': 'success', 'data': stt_result, 'time': round(time.time() - start, 2)})   
     except Exception as e:
         return jsonify({'error': str(e)}), 500
