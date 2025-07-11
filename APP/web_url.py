@@ -27,9 +27,9 @@ openai_summary_model = summary_pipe.set_openai_client()
 
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
-    if 'file' not in request.files:
+    if 'file_name' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
-    audio_file = request.files['file']
+    audio_file = request.files['file_name']
     chunk_length = int(request.form.get('chunk_length', 300))
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -37,7 +37,6 @@ def process_audio():
         audio_file.save(tmp_path)
     try:
         start = time.time()
-
         # 1. Preprocess
         clean_audio = frontend_pipe.process_audio(tmp_path, chunk_length=chunk_length, deverve=True)
         vad_result = vad_pipe.get_vad_timestamp(clean_audio)
@@ -49,12 +48,14 @@ def process_audio():
         label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
         full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
         final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
+        print(f'Diarization Done !: {time.time() - start}초')
 
         # 3. Save RTTM and run STT
         diar_pipe.save_merged_rttm(final_diar, tmp_path)
         rttm_file = tmp_path.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
         diar_result = stt_pipe.read_rttm(rttm_file)
         stt_result = stt_pipe.transcribe_by_rttm(tmp_path, diar_result)
+        print(f'STT Done !: {time.time() - start}초')
         summary_result = summary_pipe.summarize(openai_summary_model, stt_result) 
         print(f'Summarize Done !: {time.time() - start}초')
         
@@ -69,5 +70,6 @@ def process_audio():
     finally:
         os.remove(tmp_path)
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=8081)
