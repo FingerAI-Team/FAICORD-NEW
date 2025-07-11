@@ -407,7 +407,7 @@ class PostProcessPipe(BasePipeline):
                 for speaker, embs in speaker_to_embs.items()
             }
             mapping = {}
-            current_chunk_registered = {}  # 현재 청크 내에서 방금 등록한 speaker
+            current_chunk_registered = {}     # 현재 청크 내에서 방금 등록한 speaker
             for speaker, centroid in speaker_centroids.items():
                 if chunk_idx == 0:
                     speaker_registry[speaker] = centroid
