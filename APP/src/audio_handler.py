@@ -100,6 +100,9 @@ class NoiseHandler:
                 sigIn = librosa.resample(sigIn, orig_sr=fs, target_sr=48000)
                 sigIn = sigIn.astype(np.float32)  # 💡 float32로 명시적으로 캐스팅
                 fs = 48000
+            if sigIn.ndim == 2:
+                print(f"[INFO] Stereo detected: {sigIn.shape} → Converting to mono")
+                sigIn = np.mean(sigIn, axis=1)
             enhancer = NSnet2Enhancer(fs=fs)
             outSig = enhancer(sigIn, fs)
             pcm_int16 = np.int16(outSig * 32767)
