@@ -18,6 +18,12 @@ def main(args):
 
     vad_config = os.path.join(args.model_config_path, 'pyannote_vad_config.yaml')
     diar_config = os.path.join(args.model_config_path, 'pyannote_diarization_config.yaml')
+    with open(os.path.join('./config', "default_system_prompt.txt"), "r", encoding="utf-8") as f:
+        system_prompt = f.read()
+    
+    with open(os.path.join('./config', "default_subrole_prompt.txt"), "r", encoding="utf-8") as f:
+        subrole_prompt = f.read()
+    
     frontend_pipe = FrontendPipe()
     vad_pipe = VADPipe(vad_config)
     diar_pipe = DIARPipe(diar_config)
@@ -27,7 +33,6 @@ def main(args):
     stt_pipe = STTPipe(whisper_api=whisper_api, generation_config=generation_config)
     summary_pipe = SummaryPipe(config=generation_config, api_key=os.getenv('OPENAI_API'))
     openai_summary_model = summary_pipe.set_openai_client()
-    
     '''
     Cleanse audio, Get VAD Result, Get Diar Result, Process Diar Result 
     '''
@@ -55,7 +60,7 @@ def main(args):
     with open(os.path.join('./dataset/stt/', save_file_name), "w", encoding="utf-8") as f:
         json.dump(stt_result, f, ensure_ascii=False, indent=2)
    
-    summary_result = summary_pipe.summarize(openai_summary_model, stt_result) 
+    summary_result = summary_pipe.summarize(openai_summary_model, stt_result, system_prompt=system_prompt, subrole_prompt=subrole_prompt) 
     print(f'Summarize Done !: {time.time() - start}초')
     markdown_text = summary_pipe.convert_minutes_to_markdown(summary_result)
     save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '_summary.html'    
