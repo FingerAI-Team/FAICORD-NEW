@@ -13,3 +13,5 @@
 /APP/src/wespeaker
 /APP/src/nsnet2_denoiser
 /APP/dataset
+APP/config/default_subrole_prompt.txt
+APP/config/default_system_prompt.txt
