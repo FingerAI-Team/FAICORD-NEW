@@ -299,7 +299,7 @@ class SummaryPipe(BasePipeline):
         openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
         return openai_summary_model
 
-    def summarize(self, summary_model, text):
+    def summarize(self, summary_model, text, system_prompt=None, subrole_prompt=None):
         '''
         회의록 요약
         input:
@@ -309,7 +309,7 @@ class SummaryPipe(BasePipeline):
             - summary: 요약된 텍스트
         '''
         summary_model.set_generation_config()
-        summary_model.set_summary_guideline()
+        summary_model.set_summary_guideline(system_prompt, subrole_prompt)
         # print('', end='\n\n')
         # print(summary_model.system_role, end='\n\n')
         prompt_template = summary_model.set_prompt_template(text)
