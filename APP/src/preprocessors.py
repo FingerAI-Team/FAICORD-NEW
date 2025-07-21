@@ -122,3 +122,4 @@ class AudioFileProcessor:
         audio_file = AudioSegment.from_file(m4a_path, format='m4a')
         wav_path = m4a_path.replace('m4a', 'wav')
         audio_file.export(wav_path, format='wav')
+        return wav_path
