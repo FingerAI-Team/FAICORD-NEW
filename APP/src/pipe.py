@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 import tempfile
 import torch
-import time 
+import time
+import json
 import re 
 
 class BasePipeline:
@@ -53,8 +54,8 @@ class FrontendPipe(BasePipeline):
     def process_audio(self, audio_file, fade_ms=50, chunk_length=300, deverve=False):
         if isinstance(audio_file, str) and audio_file.lower().endswith(".m4a"):
             print(f"[INFO] M4A 파일 감지됨 → WAV로 변환 중: {audio_file}")
-            audio_file = self.m4a_to_wav(audio_file)
-            
+            audio_file = self.audio_file_processor.m4a_to_wav(audio_file)
+
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file)
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
         print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
@@ -220,16 +221,14 @@ class STTPipe(BasePipeline):
         df = pd.read_csv(rttm_file, sep=' ', header=None, names=columns, engine='python')
         df = df[['file_id', 'start', 'duration', 'speaker']]
         return df
-
-    def transcribe_by_rttm(self, whisper_audio, diar_result, transcribe_type='api'):
+    
+    def transcribe_by_rttm(self, whisper_audio, diar_result, transcribe_type='api', max_workers=8):
         results = []
-        text_filter = dict()
-        text_filter['temperature'] = 0.8
-        text_filter['no_speech_prob'] = 0.5
+        text_filter = {'temperature': 0.8, 'no_speech_prob': 0.5}
+        
         if transcribe_type == 'api' and diar_result is not None:
             waveform, sample_rate = self.stt_model.prepare_whisper_audio(whisper_audio)
-            print(f'sample_rate: {sample_rate}')
-            # waveform, sample_rate = whisper_audio  # waveform: Tensor (1, N)
+            segments = []
             for idx, row in diar_result.iterrows():
                 start_sec = row['start']
                 end_sec = row['start'] + row['duration']
@@ -238,15 +237,35 @@ class STTPipe(BasePipeline):
                 start_sample = int(start_sec * sample_rate)
                 end_sample = int(end_sec * sample_rate)
                 segment_waveform = waveform[:, start_sample:end_sample]
-                stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
-                # print(len(stt_result))
-                if stt_result != None:
-                    text_result = self.stt_model.extract_text(stt_result, text_filter)
-                    # print(text_result) 
-                results.append({
-                    'speaker': speaker,
-                    'text': text_result
-                })
+                segments.append((segment_waveform, sample_rate, speaker, start_sec))
+
+            def transcribe_segment_safe(segment_waveform, sample_rate, speaker, start_sec, retry=3):
+                for attempt in range(retry):
+                    try:
+                        stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
+                        if stt_result:
+                            text_result = self.stt_model.extract_text(stt_result, text_filter)
+                            return {'speaker': speaker, 'text': text_result, 'start': start_sec}
+                    except Exception as e:
+                        print(f"[Retry {attempt+1}] Error for speaker {speaker}: {e}")
+                        time.sleep(1)
+                return {'speaker': speaker, 'text': None, 'start': start_sec}
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(transcribe_segment_safe, seg[0], seg[1], seg[2], seg[3])
+                    for seg in segments
+                ]
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        print(f"Error during transcription: {e}")
+        
+            results.sort(key=lambda x: x['start'])
+            for r in results:
+                del r['start']
         return results
 
     def extract_only_text(self, segments):
@@ -302,6 +321,11 @@ class SummaryPipe(BasePipeline):
     def set_openai_client(self):
         openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
         return openai_summary_model
+    
+    def read_stt_result(self, stt_path):
+        with open(stt_path, "r", encoding="utf-8") as f:
+            stt_result = json.load(f)
+        return stt_result
 
     def summarize(self, summary_model, text, system_prompt=None, subrole_prompt=None):
         '''
