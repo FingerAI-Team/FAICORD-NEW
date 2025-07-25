@@ -15,8 +15,10 @@ services:
               capabilities: [gpu]
     volumes:
       - .:/faicord 
-      - /data/audio:/faicord/audio
-      - /data/json:/faicord/stt
+      - /data/uploaded_files/audio:/faicord/dataset/audio
+      - /data/uploaded_files/diar_results:/faicord/dataset/rttm 
+      - /data/uploaded_files/stt_results/:/faicord/dataset/stt
+      - /data/uploaded_files/summary_results/:/faicord/dataset/summary
     ports:
       - "8081:8081"
     stdin_open: true
