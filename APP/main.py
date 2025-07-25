@@ -40,7 +40,10 @@ def main(args):
     print(f'cleanse time: {time.time() - start}')
     vad_result = vad_pipe.get_vad_timestamp(clean_audio)
     diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
+    diar_pipe.save_merged_rttm(diar_result, file_name='test.rttm')
+    # print(diar_result)
     processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
+    # print(processed_diar)
     # relabeled_diar = postprocess_pipe.relabel_nonoverlapped_labels(args.file_name, non_overlapped_diar)
     
     chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
@@ -59,7 +62,9 @@ def main(args):
     save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '.json'
     with open(os.path.join('./dataset/stt/', save_file_name), "w", encoding="utf-8") as f:
         json.dump(stt_result, f, ensure_ascii=False, indent=2)
-   
+    
+    stt_result = summary_pipe.read_stt_result(os.path.join('./dataset/stt/', save_file_name))
+    print(stt_result)
     summary_result = summary_pipe.summarize(openai_summary_model, stt_result, system_prompt=system_prompt, subrole_prompt=subrole_prompt) 
     print(f'Summarize Done !: {time.time() - start}초')
     markdown_text = summary_pipe.convert_minutes_to_markdown(summary_result)
