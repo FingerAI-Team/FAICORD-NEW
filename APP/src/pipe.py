@@ -468,6 +468,95 @@ class PostProcessPipe(BasePipeline):
             chunkwise_mapping[chunk_idx] = mapping
         return chunkwise_mapping
 
+    def build_label_mapping_dict_v2(self, chunk_emb_array, threshold=0.6, top_k=3):
+        '''
+        Build global speaker mapping dict by initializing from the best chunk
+        and then matching speakers across all other chunks using embedding similarity.
+        
+        Parameters:
+            - chunk_emb_array: List of tuples like (chunk_idx, emb_array, original_labels, segment_bounds)
+            - threshold: cosine similarity threshold for matching
+            - top_k: number of initial chunks to consider when choosing best chunk
+        
+        Returns:
+            - chunkwise_mapping: Dict of chunk_idx → {local_label → global_label}
+        '''
+        # 1. 선택 기준: 가장 많은 화자를 포함한 초기 청크 선택
+        def select_initial_chunk(chunks, top_k=3):
+            chunk_stats = [
+                (chunk_idx, len(set(labels)))
+                for chunk_idx, _, labels, _ in chunks[:top_k]
+            ]
+            best_chunk = max(chunk_stats, key=lambda x: x[1])
+            return best_chunk[0]
+
+        def get_next_speaker_name():
+            existing_ids = [
+                int(re.search(r'\d+', label).group())
+                for label in speaker_registry.keys()
+                if re.match(r'^SPEAKER_\d+$', label)
+            ]
+            next_id = max(existing_ids) + 1 if existing_ids else 0
+            return f'SPEAKER_{next_id:02d}'
+
+        def compute_centroids(emb_array, labels):
+            speaker_to_embs = defaultdict(list)
+            for emb, label in zip(emb_array, labels):
+                if label == 'UNKNOWN':
+                    continue
+                speaker_to_embs[label].append(emb)
+            return {
+                speaker: np.mean(np.stack(embs), axis=0)
+                for speaker, embs in speaker_to_embs.items()
+            }
+        speaker_registry = {}           # global_label: centroid
+        chunkwise_mapping = {}          # chunk_idx: {local → global}
+        initial_chunk_idx = select_initial_chunk(chunk_emb_array, top_k=top_k)
+
+        # 2. 초기 청크만 먼저 처리하여 global registry 초기화
+        for chunk_idx, emb_array, original_labels, _ in chunk_emb_array:
+            if chunk_idx != initial_chunk_idx:
+                continue
+            speaker_centroids = compute_centroids(emb_array, original_labels)
+            mapping = {}
+            for speaker, centroid in speaker_centroids.items():
+                speaker_registry[speaker] = centroid
+                mapping[speaker] = speaker
+                print(f"[INIT][chunk {chunk_idx}] {speaker} → {speaker}")
+            chunkwise_mapping[chunk_idx] = mapping
+
+        for chunk_idx, emb_array, original_labels, _ in chunk_emb_array:
+            if chunk_idx == initial_chunk_idx:
+                continue
+
+            speaker_centroids = compute_centroids(emb_array, original_labels)
+            mapping = {}
+            current_chunk_registered = {}
+            for speaker, centroid in speaker_centroids.items():
+                best_similarity = -1
+                best_key = None
+                for reg_label, reg_centroid in speaker_registry.items():
+                    sim = self.calc_emb_similarity(torch.tensor(reg_centroid), torch.tensor(centroid))
+                    if sim > best_similarity:
+                        best_similarity = sim
+                        best_key = reg_label
+                for reg_label, reg_centroid in current_chunk_registered.items():
+                    sim = self.calc_emb_similarity(torch.tensor(reg_centroid), torch.tensor(centroid))
+                    if sim > best_similarity:
+                        best_similarity = sim
+                        best_key = reg_label
+                if best_similarity >= threshold:
+                    mapping[speaker] = best_key
+                    print(f"[MAP][chunk {chunk_idx}] {speaker} → {best_key} (sim={best_similarity:.2f})")
+                else:
+                    new_label = get_next_speaker_name()
+                    speaker_registry[new_label] = centroid
+                    current_chunk_registered[new_label] = centroid
+                    mapping[speaker] = new_label
+                    print(f"[NEW][chunk {chunk_idx}] {speaker} → {new_label} 등록됨 (sim={best_similarity:.2f})")
+            chunkwise_mapping[chunk_idx] = mapping
+        return chunkwise_mapping
+
     def relabel_nonoverlapped_labels(self, file_name, diar_result, k=5):
         '''
         input:
@@ -560,3 +649,24 @@ class PostProcessPipe(BasePipeline):
                     chunk_result.append(((start, end), new_label))
             relabeled.append(chunk_result)    # 청크별 결과를 이중 리스트로 유지
         return relabeled
+
+class EMBPipe(BasePipeline):
+    '''
+    speaker embedding pipeline
+    '''
+    def __init__(self, config):
+        super().__init__()
+        self.wsemb = WSEMB()
+        self.emb_model = self.wsemb.load_model(model_path=config['model_path'])
+        self.emb_visualizer = EMBVisualizer()
+
+    def get_emb_from_file(self, file_name):
+        emb = self.wsemb.get_embedding(self.emb_model, file_name)
+        return emb
+
+    def plot_tsne(self, emb_array, labels, save_path=None):
+        '''
+        emb_array: numpy array of shape (n_samples, n_features)
+        labels: list of speaker labels corresponding to each embedding
+        '''
+        self.emb_visualizer.tsne_and_plot(emb_array, labels, title='test', file_path=save_path)
