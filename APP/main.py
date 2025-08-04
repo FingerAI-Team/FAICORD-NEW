@@ -47,7 +47,7 @@ def main(args):
     # relabeled_diar = postprocess_pipe.relabel_nonoverlapped_labels(args.file_name, non_overlapped_diar)
     
     chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
-    label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
+    label_mapping_dict = postprocess_pipe.build_label_mapping_dict_v2(chunk_emb_array)
     # print(label_mapping_dict)
     
     full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
