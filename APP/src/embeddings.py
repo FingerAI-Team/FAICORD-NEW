@@ -264,8 +264,9 @@ class EMBVisualizer(BaseEMB):
         labels: list of str (len=N)
         title: plot title
         """
+        X = np.array(embeddings)
         tsne = TSNE(n_components=2, metric='cosine', perplexity=5, random_state=42)
-        embeddings_2d = tsne.fit_transform(embeddings)
+        embeddings_2d = tsne.fit_transform(X)
 
         plt.figure(figsize=(8,6))
         unique_labels = list(set(labels))
