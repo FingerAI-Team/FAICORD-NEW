@@ -327,6 +327,16 @@ class SummaryPipe(BasePipeline):
             stt_result = json.load(f)
         return stt_result
 
+    def split_stt_result(self, stt_result, chunk_count=3):
+        total_len = len(stt_result)
+        chunk_size = total_len // chunk_count
+        chunks = []
+        for i in range(chunk_count):
+            start = i * chunk_size
+            end = (i + 1) * chunk_size if i < chunk_count - 1 else total_len
+            chunks.append(stt_result[start:end])
+        return chunks  # [초반부, 중반부, 후반부]
+
     def summarize(self, summary_model, text, system_prompt=None, subrole_prompt=None):
         '''
         회의록 요약
