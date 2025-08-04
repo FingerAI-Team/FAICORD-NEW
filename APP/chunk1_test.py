@@ -1,6 +1,6 @@
 from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.metrics.pairwise import cosine_distances
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
 from dotenv import load_dotenv
 import argparse
 import markdown
