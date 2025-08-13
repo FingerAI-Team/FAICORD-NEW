@@ -17,3 +17,4 @@
 /APP/config/default_subrole_prompt.txt
 /APP/config/default_system_prompt.txt
 /APP/config/concat_system_prompt.txt
+APP/web_url.py
