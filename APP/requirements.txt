@@ -27,3 +27,4 @@ flask                 # 만약 Flask API도 일부 사용하는 경우 유지
 # FastAPI 관련 추가
 fastapi
 uvicorn[standard]
+python-multipart
