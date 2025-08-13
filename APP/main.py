@@ -40,7 +40,7 @@ def main(args):
     print(f'cleanse time: {time.time() - start}')
     vad_result = vad_pipe.get_vad_timestamp(clean_audio)
     diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
-    diar_pipe.save_merged_rttm(diar_result, file_name='test.rttm')
+    # diar_pipe.save_merged_rttm(diar_result, file_name='test.rttm')
     # print(diar_result)
     processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
     # print(processed_diar)
@@ -48,12 +48,9 @@ def main(args):
     
     chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
     label_mapping_dict = postprocess_pipe.build_label_mapping_dict_v2(chunk_emb_array)
-    # print(label_mapping_dict)
-    
-    full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
+    # print(label_ non_overlapped_diar)
     final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-    rttm_file = args.file_name.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
-    diar_pipe.save_merged_rttm(final_diar, file_name=rttm_file)
+    rttm_file = args.file_name.replace('/audio/', '/rttm/'
     print(f'Diarization Done !: {time.time() - start}초')
     
     diar_result = stt_pipe.read_rttm(rttm_file)
