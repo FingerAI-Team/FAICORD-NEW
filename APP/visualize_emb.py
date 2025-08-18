@@ -1,7 +1,6 @@
-from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe, EMBPipe
+from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, EMBPipe
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
-
 from dotenv import load_dotenv
 import argparse
 import markdown
@@ -16,9 +15,6 @@ def main(args):
     '''
     start = time.time()
     load_dotenv()
-    with open(os.path.join(args.whisper_config_path, 'generation_config.json')) as f: 
-        generation_config = json.load(f)
-
     with open(os.path.join(args.model_config_path, 'wespeak_config.json')) as f: 
         emb_config = json.load(f)
 
@@ -32,8 +28,8 @@ def main(args):
 
     # print(np.shape(emb_pipe.get_emb_from_file(args.file_name)))
     # speaker_emb = emb_pipe.get_emb_from_file(args.file_name)
-    speaker_emb2 = emb_pipe.get_emb_from_file('./dataset/audio/원라인.wav')
-    speaker_emb3 = emb_pipe.get_emb_from_file('./dataset/audio/김태완매니저3.wav')
+    speaker_emb2 = emb_pipe.get_emb_from_file('./dataset/audio/원라인2.wav')
+    speaker_emb3 = emb_pipe.get_emb_from_file('./dataset/audio/원라인.wav')
     # embeddings = np.vstack([speaker_emb, speaker_emb2, speaker_emb3])
     # labels = ['speaker_a', 'speaker_b', 'speaker_a']
     # emb_pipe.plot_tsne(embeddings, labels, save_path='./dataset/emb/')
@@ -50,7 +46,7 @@ if __name__ == '__main__':
     cli_parser.add_argument('--whisper_config_path', type=str, default='./config')
     cli_parser.add_argument('--model_config_path', type=str, default='./models')
     cli_parser.add_argument('--emb_config_path', type=str, default='./models')
-    cli_parser.add_argument('--file_name', type=str, required=True)
+    # cli_parser.add_argument('--file_name', type=str, required=True)
     cli_parser.add_argument('--chunk_length', type=int, default=300)
     cli_args = cli_parser.parse_args()
     main(cli_args)

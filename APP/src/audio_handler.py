@@ -6,6 +6,7 @@ from pydub import AudioSegment
 from nara_wpe.wpe import wpe
 from io import BytesIO
 import matplotlib.pyplot as plt
+import matplotlib
 matplotlib.use("Agg")  # 서버 사이드 렌더러
 import pyloudnorm as pyln
 import noisereduce as nr
