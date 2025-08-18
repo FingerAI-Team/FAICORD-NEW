@@ -225,7 +225,6 @@ class STTPipe(BasePipeline):
     def transcribe_by_rttm(self, whisper_audio, diar_result, transcribe_type='api', max_workers=8):
         results = []
         text_filter = {'temperature': 0.8, 'no_speech_prob': 0.5}
-        
         if transcribe_type == 'api' and diar_result is not None:
             waveform, sample_rate = self.stt_model.prepare_whisper_audio(whisper_audio)
             segments = []
@@ -262,7 +261,6 @@ class STTPipe(BasePipeline):
                         results.append(result)
                     except Exception as e:
                         print(f"Error during transcription: {e}")
-        
             results.sort(key=lambda x: x['start'])
             for r in results:
                 del r['start']
@@ -277,36 +275,6 @@ class STTPipe(BasePipeline):
         for seg in segments: 
             texts += seg.text + " "
         return texts
-
-    def merge_consecutive_same_speaker(self, df):
-        merged = []
-        df = df.sort_values('start').reset_index(drop=True)
-        cur_start = df.loc[0, 'start']
-        cur_end = cur_start + df.loc[0, 'duration']
-        cur_speaker = df.loc[0, 'speaker']
-        file_id = df.loc[0, 'file_id']
-        for i in range(1, len(df)):
-            row = df.loc[i]
-            start = row['start']
-            end = start + row['duration']
-            speaker = row['speaker']
-            if speaker == cur_speaker:
-                # 연속된 동일 화자면 확장
-                cur_end = end
-            else:
-                # 다른 화자면 지금까지 병합한 것 저장
-                merged.append([file_id, round(cur_start, 6), round(cur_end - cur_start, 6), cur_speaker])
-                # 다음 화자로 초기화
-                cur_start = start
-                cur_end = end
-                cur_speaker = speaker
-        # 마지막 화자 블록 저장
-        merged.append([
-            file_id, round(cur_start, 6), round(cur_end - cur_start, 6), cur_speaker
-        ])
-        return pd.DataFrame(merged, columns=[
-            'file_id', 'start', 'duration', 'speaker'
-        ])
 
 
 class SummaryPipe(BasePipeline):
@@ -373,6 +341,38 @@ class SummaryPipe(BasePipeline):
             else:
                 md_lines.append(line)
         return '\n'.join(md_lines)    
+
+    def format_stt_to_prompt(self, stt_list):
+        """
+        STT 결과 리스트를 학습용 prompt 텍스트로 변환
+        """
+        lines = []
+        for item in stt_list:
+            speaker = item.get("speaker", "")
+            text = item.get("text", "").strip()
+            if speaker and text:
+                lines.append(f"{speaker}: {text}")
+        return "\n".join(lines)
+
+    def build_jsonl_entry(self, stt_list, gpt_summary):
+        """
+        단일 jsonl 데이터 구성 (prompt + response)
+        """
+        prompt = format_stt_to_prompt(stt_list)
+        return {
+            "prompt": prompt,
+            "response": gpt_summary.strip()
+        }
+
+    def export_jsonl(self, data_pairs, output_path):
+        """
+        data_pairs: list of (stt_list, gpt_summary) tuples
+        """
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for stt, summary in data_pairs:
+                entry = build_jsonl_entry(stt, summary)
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        print(f"[✔] Saved {len(data_pairs)} samples to {output_path}")
 
 
 class PostProcessPipe(BasePipeline):
@@ -680,3 +680,33 @@ class EMBPipe(BasePipeline):
         labels: list of speaker labels corresponding to each embedding
         '''
         self.emb_visualizer.tsne_and_plot(emb_array, labels, title='test', file_path=save_path)
+
+    def get_xy_tsne(self, emb_array, labels, file_names, as_dict=True):
+        return self.emb_visualizer.get_xy_tsne(emb_array, labels=labels, file_names=file_names, as_dict=as_dict)
+
+class VisualizePipe(BasePipeline):
+    def __init__(self):
+        super().__init__()
+        self.audio_visualizer = AudioVisualizer()
+    
+    def get_melspectrogram(self, audio_file):
+        '''
+        Get mel spectrogram from audio file
+        input:
+            - audio_file: audio file path
+        output:
+            - melspectrogram: numpy array of shape (n_mels, time_steps)
+        '''
+        return self.audio_visualizer.melspec_png_base64(audio_file)
+
+    def get_waveform(self, audio_file):
+        '''
+        Get mel spectrogram from audio file
+        input:
+            - audio_file: audio file path
+        output:
+            - melspectrogram: numpy array of shape (n_mels, time_steps)
+        '''
+        return self.audio_visualizer.waveform_png_base64(audio_file)
+        
+        
