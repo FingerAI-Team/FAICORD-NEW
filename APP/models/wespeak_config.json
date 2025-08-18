@@ -1,4 +1,4 @@
 {
     "model_name": "wespeak/wespeaker-voxceleb-resnet34",
-    "model_path": "pretrained_models/voxceleb_resnet221_LM"
+    "model_path": "pretrained_models/voxceleb_resnet293_LM"
 }
