@@ -1,4 +1,4 @@
-from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe, EMBPipe
+from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe, EMBPipe, VisualizePipe
 from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -53,11 +53,18 @@ class VisualizeEmbRequest(BaseModel):
     audio_file_list: List[str]
     label_list: List[str]
 
+class MelReq(BaseModel):
+    audio_file: str
+
+class WaveformReq(BaseModel):
+    audio_file: str
+
 frontend_pipe = FrontendPipe()
 vad_pipe = VADPipe(vad_config)
 diar_pipe = DIARPipe(diar_config)
 emb_pipe = EMBPipe(emb_config)
 postprocess_pipe = PostProcessPipe()
+visualize_pipe = VisualizePipe()
 
 whisper_api = os.getenv('OPENAI_API')
 stt_pipe = STTPipe(whisper_api=whisper_api, generation_config=generation_config)
@@ -86,7 +93,6 @@ async def process_audio_endpoint(
         return {"status": "success", "message": "Audio processing started."}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
 
 def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_id: Optional[str] = None, meeting_dir: Optional[str] = None):
     try:
@@ -126,7 +132,6 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         os.makedirs(stt_dir, exist_ok=True)
         stt_file_name = f'./dataset/stt/{meeting_dir}/{job_id}.json'
         # stt_file_name = wav_file_name.replace('/audio', '/stt').replace('.wav', '.json')
-
         with open(stt_file_name, "w", encoding="utf-8") as f:
             json.dump(stt_result, f, ensure_ascii=False, indent=2)
 
@@ -255,6 +260,21 @@ def visualize_emb(req: VisualizeEmbRequest):
     )
     return xy_list
 
+@app.post("/visualize_spectogram")
+def visualize_spectogram(req: MelReq):
+    if not os.path.isfile(req.audio_file):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    out = visualize_pipe.get_melspectrogram(req.audio_file)
+    # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
+    return out
+
+@app.post("/visualize_waveform")
+def visualize_waveform(req: WaveformReq):
+    if not os.path.isfile(req.audio_file):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    out = visualize_pipe.get_waveform(req.audio_file)
+    # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
+    return out
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=9050, reload=True)
