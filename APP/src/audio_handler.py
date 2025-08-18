@@ -6,6 +6,7 @@ from pydub import AudioSegment
 from nara_wpe.wpe import wpe
 from io import BytesIO
 import matplotlib.pyplot as plt
+matplotlib.use("Agg")  # 서버 사이드 렌더러
 import pyloudnorm as pyln
 import noisereduce as nr
 import soundfile as sf
@@ -239,6 +240,47 @@ class AudioVisualizer:
             plt.savefig(file_name, dpi=300)
         plt.close()
 
+    def waveform_png_base64(audio_path: str,
+                        sr: int = 16000,
+                        time_range: tuple[float, float] | None = None,
+                        dpi: int = 200):
+        """
+        audio_path를 읽어서 웨이브폼 이미지를 Base64로 반환.
+        - time_range: (start_sec, end_sec) 지정 시 해당 구간만 시각화
+        """
+        offset = None
+        duration = None
+        if time_range and len(time_range) == 2:
+            start, end = float(time_range[0]), float(time_range[1])
+            start = max(0.0, start)
+            if end > start:
+                offset = start
+                duration = end - start
+
+        y, sr = librosa.load(audio_path, sr=sr, mono=True, offset=offset, duration=duration)
+
+        fig, ax = plt.subplots(figsize=(12, 2.6))
+        librosa.display.waveshow(y, sr=sr, ax=ax)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Amplitude")
+        ax.set_title("Waveform")
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+
+        b64 = base64.b64encode(buf.read()).decode("ascii")
+        return {
+            "image_base64": b64,
+            "media_type": "image/png",
+            "sr": sr,
+            "duration": len(y) / sr,
+            "n_samples": int(len(y)),
+        }
+
     def get_spectrogram(self, y, sr, title_prefix="", file_name=None):
         D = librosa.amplitude_to_db(np.abs(librosa.stft(y, n_fft=self.n_fft, hop_length=self.hop_length)), ref=np.max)
         plt.figure(figsize=(14, 3))
@@ -263,6 +305,41 @@ class AudioVisualizer:
         if file_name:
             plt.savefig(file_name, dpi=300)
         plt.close()
+
+    def melspec_png_base64(audio_path: str,
+                       sr: int = 16000,
+                       n_fft: int = 1024,
+                       hop_length: int = 256,
+                       n_mels: int = 128,
+                       fmin: float = 0.0,
+                       fmax: float | None = None,
+                       top_db: float = 80.0,
+                       power: float = 2.0,
+                       dpi: int = 200):
+        y, sr = librosa.load(audio_path, sr=sr, mono=True)
+        S = librosa.feature.melspectrogram(
+            y=y, sr=sr, n_fft=n_fft, hop_length=hop_length,
+            n_mels=n_mels, power=power, fmin=fmin, fmax=fmax
+        )
+        S_db = librosa.power_to_db(S, ref=np.max, top_db=top_db)
+
+        fig, ax = plt.subplots(figsize=(12, 3))
+        img = librosa.display.specshow(S_db, sr=sr, hop_length=hop_length,
+                                    x_axis='time', y_axis='mel', cmap='magma', ax=ax)
+        cbar = plt.colorbar(img, ax=ax, format="%+2.0f dB")
+        ax.set_title("Mel Spectrogram")
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+        b64 = base64.b64encode(buf.read()).decode("ascii")
+        return {
+            "image_base64": b64,
+            "media_type": "image/png",
+            "sr": sr, "n_fft": n_fft, "hop_length": hop_length, "n_mels": n_mels,
+        }
 
     def visualize_all(self, y, sr, title_prefix="", file_name=None):
         # 전체를 한 번에 시각화 (waveform + STFT + Mel)
