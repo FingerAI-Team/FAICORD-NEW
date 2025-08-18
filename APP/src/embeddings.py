@@ -258,6 +258,47 @@ class EMBVisualizer(BaseEMB):
     def __init__(self):
         super().__init__()
 
+    def get_xy_tsne(self, embeddings, labels=None, file_names=None, perplexity=None, metric="cosine", seed=42, as_dict=False):
+        """
+        embeddings: array-like [N, D]
+        return: (x_list, y_list) 또는 [{'x':..,'y':..,'label':..,'name':..}, ...]
+        """
+        X = np.asarray(embeddings, dtype=np.float32)
+        n = X.shape[0]
+        if n == 0:
+            return ([], []) if not as_dict else []
+        if n < 3:
+            coords = np.column_stack([np.arange(n), np.zeros(n)]).astype(np.float32)
+        else:
+            # perplexity 자동 설정 (규칙: perplexity < n_samples)
+            if perplexity is None:
+                perplexity = min(30, max(2, n // 3))
+            perplexity = min(perplexity, n - 1)
+            try:
+                tsne = TSNE(
+                    n_components=2,
+                    metric=metric,
+                    perplexity=perplexity,
+                    learning_rate="auto",
+                    random_state=seed,
+                    n_iter=1000,
+                )
+                coords = tsne.fit_transform(X).astype(np.float32)
+            except Exception:
+                # 드물게 t-SNE가 실패할 수 있으니 PCA로 폴백
+                coords = PCA(n_components=2, random_state=seed).fit_transform(X).astype(np.float32)
+
+        if as_dict:
+            labels = labels if labels is not None else [""] * n
+            names  = file_names if file_names  is not None else [""] * n
+            return [
+                {"x": float(coords[i,0]), "y": float(coords[i,1]),
+                "label": labels[i], "name": names[i]}
+                for i in range(n)
+            ]
+        else:
+            return coords[:, 0].tolist(), coords[:, 1].tolist()
+
     def tsne_and_plot(self, embeddings, labels, title, file_path=None):
         """
         embeddings: numpy array [N, D]
