@@ -412,7 +412,7 @@ class PostProcessPipe(BasePipeline):
             chunk_emb_array.append((idx, emb_array, original_labels, segments))
         return chunk_emb_array    
 
-    def build_label_mapping_dict(self, chunk_emb_array, threshold=0.6):
+    def build_label_mapping_dict(self, chunk_emb_array, threshold=0.55):
         '''
         Maps speakers across chunks using speaker embeddings.
         input:
@@ -423,6 +423,11 @@ class PostProcessPipe(BasePipeline):
         '''
         speaker_registry = {}  # global_label: centroid
         chunkwise_mapping = {}
+
+        def _l2(x):
+            norm = np.linalg.norm(x)
+            return x if norm == 0 else x / norm
+            
         def get_next_speaker_name():
             existing_ids = [
                 int(re.search(r'\d+', label).group())
@@ -433,15 +438,15 @@ class PostProcessPipe(BasePipeline):
             return f'SPEAKER_{next_id:02d}'
 
         for chunk_idx, emb_array, original_labels, segment_bounds in chunk_emb_array:
-            # print(f"[DEBUG] chunk {chunk_idx} — labels: {original_labels}")
             speaker_to_embs = defaultdict(list)
             for emb, label in zip(emb_array, original_labels):
                 if label == 'UNKNOWN':
                     print('detected unknown')
                     continue
-                speaker_to_embs[label].append(emb)
+                speaker_to_embs[label].append(_l2(emb))  # 개별 임베딩 정규화
+
             speaker_centroids = {
-                speaker: np.mean(np.stack(embs), axis=0)
+                speaker: _l2(np.mean(np.stack(embs), axis=0))  # 센트로이드 정규화
                 for speaker, embs in speaker_to_embs.items()
             }
             mapping = {}
