@@ -117,6 +117,19 @@ class WSEMB(BaseEMB):
         embedding = model.extract_embedding(file_name)
         return embedding 
 
+    def get_emb_func(self, model, audio_path, start_sec, end_sec):
+        waveform, sr = torchaudio.load(audio_path)
+        start_sample = int(start_sec * sr)
+        end_sample = int(end_sec * sr)
+        segment = waveform[:, start_sample:end_sample]
+        if sr != 16000:
+            resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)
+            segment = resampler(segment)
+
+        # → 모델에 맞게 np.array 또는 torch.Tensor 형태로 넘기기
+        emb = model.extract_embedding(segment.numpy(), sr=16000)
+        return emb  # L2 정규화는 바깥에서 처리하므로 여기서는 안 해도 됨
+
     def get_embeddings_from_file(self, model, file_path, file_list):
         '''
         여러 파일들을 입력으로 받아 각 파일별 임베딩 리스트 반환 
@@ -151,12 +164,11 @@ class WSEMB(BaseEMB):
             if (end_ms - start_ms) < 1000:  # 1초 미만
                 # print(f"[SKIP] Short segment ({time_s:.2f}s ~ {time_e:.2f}s, {end_ms - start_ms}ms) skipped.")
                 continue
-
             segment = audio[start_ms:end_ms]
             buffer = BytesIO()
             segment.export(buffer, format="wav")
-            buffer.seek(0)
             
+            buffer.seek(0)
             emb = model.extract_embedding(buffer)
             emb = self.prepare_embeddings(emb).squeeze()  # (D,) 형태로 정리
             emb_results.append(((time_s, time_e), speaker, emb))

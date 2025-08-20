@@ -26,10 +26,12 @@ def main(args):
     postprocess_pipe = PostProcessPipe()
     emb_pipe = EMBPipe(emb_config)
 
+    file_name = './dataset/audio/김태완매니저2.wav'
+    file2_name = './dataset/audio/김태완매니저3.wav'
     # print(np.shape(emb_pipe.get_emb_from_file(args.file_name)))
     # speaker_emb = emb_pipe.get_emb_from_file(args.file_name)
-    speaker_emb2 = emb_pipe.get_emb_from_file('./dataset/audio/원라인2.wav')
-    speaker_emb3 = emb_pipe.get_emb_from_file('./dataset/audio/원라인.wav')
+    speaker_emb2 = emb_pipe.get_emb_from_file(file_name)
+    speaker_emb3 = emb_pipe.get_emb_from_file(file2_name)
     # embeddings = np.vstack([speaker_emb, speaker_emb2, speaker_emb3])
     # labels = ['speaker_a', 'speaker_b', 'speaker_a']
     # emb_pipe.plot_tsne(embeddings, labels, save_path='./dataset/emb/')
@@ -39,7 +41,7 @@ def main(args):
         speaker_emb3.reshape(1, -1),
         speaker_emb2.reshape(1, -1)
     )[0][0]
-    print(f"Cosine similarity: {sim:.4f}")
+    print(f"{file_name} <-> {file2_name} | Cosine similarity: {sim:.4f}")
 
 if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()

@@ -213,10 +213,19 @@ class PostProcessPipe(BasePipeline):
     def __init__(self, chunk_offset=300):
         super().__init__(chunk_offset)
         self.wsemb = WSEMB()
-        self.emb_model = self.wsemb.load_model(model_path='./pretrained_models/voxceleb_resnet221_LM')
+        self.emb_model = self.wsemb.load_model(model_path='./pretrained_models/voxceleb_resnet293_LM')
         self.knn_cluster = KNNCluster() 
         self.emb_visualizer = EMBVisualizer()
-              
+
+    def _l2norm(self, v, eps=1e-12):
+        v = np.asarray(v, dtype=np.float32).reshape(-1)
+        n = np.linalg.norm(v)
+        return v if n == 0 else v / (n + eps)
+
+    def _centroid_norm(self, vecs):
+        V = np.stack([self._l2norm(v) for v in vecs], axis=0)  # 세그 임베딩 정규화 보장
+        return self._l2norm(V.mean(axis=0))
+
     def get_chunk_emb_array(self, file_name, diar_result):
         '''
         get speaker emb array for each audio chunk 
@@ -236,18 +245,17 @@ class PostProcessPipe(BasePipeline):
             original_labels = [speaker for (_, speaker, _) in emb_result]
             segments = [(start, end) for ((start, end), _, _) in emb_result]
             chunk_emb_array.append((idx, emb_array, original_labels, segments))
-        return chunk_emb_array    
+        return chunk_emb_array
 
     def build_label_mapping_dict(self, chunk_emb_array, threshold=0.6):
-        '''
-        Maps speakers across chunks using speaker embeddings.
-        input:
-            - chunk_emb_array: List of tuples like (chunk_idx, emb_array, original_labels, segment_bounds)
-            - threshold: Similarity threshold for matching speakers
-        output:
-            - chunkwise_mapping: Dict of chunk_idx → local_to_global speaker label mapping
-        '''
-        speaker_registry = {}  # global_label: centroid
+        """
+        Maps speakers across chunks using (L2-normalized) speaker centroids.
+        - many-to-one 매핑 허용
+        - 임베딩/센트로이드 모두 L2 정규화 → dot == cosine
+        """
+        import re
+        from collections import defaultdict
+        speaker_registry = {}  # global_label -> centroid (L2-normalized)
         chunkwise_mapping = {}
         def get_next_speaker_name():
             existing_ids = [
@@ -259,50 +267,52 @@ class PostProcessPipe(BasePipeline):
             return f'SPEAKER_{next_id:02d}'
 
         for chunk_idx, emb_array, original_labels, segment_bounds in chunk_emb_array:
-            # print(f"[DEBUG] chunk {chunk_idx} — labels: {original_labels}")
+            # 라벨별 세그 임베딩 수집 (세그 임베딩도 L2 정규화해서 평균 안정화)
             speaker_to_embs = defaultdict(list)
             for emb, label in zip(emb_array, original_labels):
                 if label == 'UNKNOWN':
-                    print('detected unknown')
                     continue
-                speaker_to_embs[label].append(emb)
+                speaker_to_embs[label].append(self._l2norm(emb))
+
+            # 라벨별 센트로이드 계산 후 L2 정규화
             speaker_centroids = {
-                speaker: np.mean(np.stack(embs), axis=0)
-                for speaker, embs in speaker_to_embs.items()
+                spk: self._l2norm(np.mean(np.stack(embs, axis=0), axis=0))
+                for spk, embs in speaker_to_embs.items()
             }
             mapping = {}
-            current_chunk_registered = {}     # 현재 청크 내에서 방금 등록한 speaker
+            current_chunk_registered = {}  # 이번 청크에서 새로 등록된 전역 센트로이드
             for speaker, centroid in speaker_centroids.items():
-                if chunk_idx == 0:
-                    speaker_registry[speaker] = centroid
-                    mapping[speaker] = speaker
-                    print(f"[INIT][chunk {chunk_idx}] {speaker} → {speaker}")
+                if chunk_idx == 0 and len(speaker_registry) == 0:
+                    for spk, centroid in speaker_centroids.items():
+                        speaker_registry[spk] = centroid
+                        mapping[spk] = spk
+                        print(f"[INIT][chunk {chunk_idx}] {spk} → {spk}")
+                    chunkwise_mapping[chunk_idx] = mapping
+                    continue  # 다음 청크로
+                # 전역 레지스트리와 이번 청크 신규 전역들 모두와 비교 (dot == cosine)
+                best_similarity = -1.0
+                best_key = None
+                for reg_label, reg_centroid in speaker_registry.items():
+                    sim = float(np.dot(reg_centroid, centroid))
+                    if sim > best_similarity:
+                        best_similarity, best_key = sim, reg_label
+
+                for reg_label, reg_centroid in current_chunk_registered.items():
+                    sim = float(np.dot(reg_centroid, centroid))
+                    if sim > best_similarity:
+                        best_similarity, best_key = sim, reg_label
+
+                if best_similarity >= threshold:
+                    mapping[speaker] = best_key
+                    print(f"[MAP][chunk {chunk_idx}] {speaker} → {best_key} (sim={best_similarity:.2f})")
                 else:
-                    best_similarity = -1
-                    best_key = None
-                    # global registry 비교
-                    for reg_label, reg_centroid in speaker_registry.items():
-                        similarity = self.calc_emb_similarity(torch.tensor(reg_centroid), torch.tensor(centroid))
-                        if similarity > best_similarity:
-                            best_similarity = similarity
-                            best_key = reg_label
-                    # 같은 chunk 내에서 방금 등록한 speaker들과도 비교
-                    for reg_label, reg_centroid in current_chunk_registered.items():
-                        similarity = self.calc_emb_similarity(torch.tensor(reg_centroid), torch.tensor(centroid))
-                        if similarity > best_similarity:
-                            best_similarity = similarity
-                            best_key = reg_label
-                    if best_similarity >= threshold:
-                        mapping[speaker] = best_key
-                        print(f"[MAP][chunk {chunk_idx}] {speaker} → {best_key} (sim={best_similarity:.2f})")
-                    else:
-                        new_label = get_next_speaker_name()
-                        speaker_registry[new_label] = centroid
-                        current_chunk_registered[new_label] = centroid
-                        mapping[speaker] = new_label
-                        print(f"[NEW][chunk {chunk_idx}] {speaker} → {new_label} 등록됨 (sim={best_similarity:.2f})")
+                    new_label = get_next_speaker_name()
+                    speaker_registry[new_label] = centroid
+                    current_chunk_registered[new_label] = centroid
+                    mapping[speaker] = new_label
+                    print(f"[NEW][chunk {chunk_idx}] {speaker} → {new_label} (sim={best_similarity:.2f})")
             chunkwise_mapping[chunk_idx] = mapping
-        return chunkwise_mapping
+        return chunkwise_mapping, speaker_registry
 
     def build_label_mapping_dict_v2(self, chunk_emb_array, threshold=0.6, top_k=3):
         '''
@@ -364,7 +374,6 @@ class PostProcessPipe(BasePipeline):
         for chunk_idx, emb_array, original_labels, _ in chunk_emb_array:
             if chunk_idx == initial_chunk_idx:
                 continue
-
             speaker_centroids = compute_centroids(emb_array, original_labels)
             mapping = {}
             current_chunk_registered = {}
@@ -420,7 +429,7 @@ class PostProcessPipe(BasePipeline):
                 else:
                     relabeled_diar.append(segment)
             relabeled_diar_result.append(relabeled_diar)
-        return relabeled_diar_result  
+        return relabeled_diar_result
 
     def apply_labels_to_full_diar(self, full_diar, relabeled_nonoverlap_diar, min_ratio=0.3):
         '''
@@ -461,6 +470,99 @@ class PostProcessPipe(BasePipeline):
             relabeled_full_diar.append(chunk_diar)
         return relabeled_full_diar
 
+    def apply_labels_to_full_diar_with_embedding(
+        self,
+        full_diar,
+        relabeled_nonoverlap_diar,
+        label_mapping_dict,
+        audio_paths,
+        speaker_prototypes=None,
+        *,
+        sim_threshold=0.6,
+        sim_margin=0.01,
+        min_duration_for_embedding=0.5,
+        verbose=False
+    ):
+        """
+        full diar: List of chunk diar → List[List[((start, end), label)]]
+        relabeled_nonoverlap_diar: chunk별 non-overlap 결과 (kNN 적용된)
+        label_mapping_dict: chunk_idx → {local_label: global_label}
+        audio_paths: chunk_idx별 오디오 경로 리스트
+        get_embedding_fn(wav_path, start, end): 음성 임베딩 계산 함수
+        speaker_prototypes: global_label → L2 normalized vector (없으면 자동 생성)
+        """
+        def _l2(x):
+            norm = np.linalg.norm(x)
+            return x if norm == 0 else x / norm
+
+        def _seg_key(start, end, precision=3):
+            return (round(start, precision), round(end, precision))
+
+        # --- 전처리: 비겹침 세그 → set + dict 생성
+        nonov_sets = []
+        nonov_label_map = []
+        for chunk_idx, diar in enumerate(relabeled_nonoverlap_diar):
+            s = set()
+            m = {}
+            label_map = label_mapping_dict.get(chunk_idx, {})
+            for (start, end), local_label in diar:
+                key = _seg_key(start, end)
+                global_label = label_map.get(local_label, local_label)
+                s.add(key)
+                m[key] = global_label
+            nonov_sets.append(s)
+            nonov_label_map.append(m)
+
+        # --- full diar 처리
+        relabeled_full_diar = []
+        for chunk_idx, chunk in enumerate(full_diar):
+            wav_path = audio_paths[chunk_idx]
+            relabeled_chunk = []
+            nonov_seg_keys = nonov_sets[chunk_idx]
+            nonov_labels = nonov_label_map[chunk_idx]
+            label_map = label_mapping_dict.get(chunk_idx, {})
+            for (start, end), original_label in chunk:
+                key = _seg_key(start, end)
+                # (1) 비겹침 세그먼트라면: 그대로 매핑해서 사용
+                if key in nonov_seg_keys:
+                    new_label = nonov_labels[key]
+                    relabeled_chunk.append(((start, end), new_label))
+                    continue
+                # (2) 겹침 세그먼트: duration 짧으면 skip
+                dur = end - start
+                if dur < min_duration_for_embedding:
+                    relabeled_chunk.append(((start, end), label_map.get(original_label, original_label)))
+                    continue
+                # (3) 임베딩 계산 후 speaker_prototypes와 cosine 비교
+                try:
+                    emb = _l2(self.wsemb.get_emb_func(self.emb_model, wav_path, start, end))
+                except Exception:
+                    relabeled_chunk.append(((start, end), label_map.get(original_label, original_label)))
+                    continue
+                best_label = None
+                best_sim = -1.0
+                second_best = -1.0
+                for glabel, proto in speaker_prototypes.items():
+                    sim = float(np.dot(emb, proto))
+                    if sim > best_sim:
+                        second_best = best_sim
+                        best_sim = sim
+                        best_label = glabel
+                    elif sim > second_best:
+                        second_best = sim
+                # (4) Threshold/margin 조건 만족할 때만 덮어쓰기
+                if best_sim >= sim_threshold and (best_sim - second_best) >= sim_margin:
+                    relabeled_chunk.append(((start, end), best_label))
+                    if verbose:
+                        print(f"[ASSIGN][{chunk_idx}] {start:.2f}-{end:.2f} → {best_label} (sim={best_sim:.3f})")
+                else:
+                    fallback_label = label_map.get(original_label, original_label)
+                    relabeled_chunk.append(((start, end), fallback_label))
+                    if verbose:
+                        print(f"[FALLBACK][{chunk_idx}] {start:.2f}-{end:.2f} → {fallback_label} (sim={best_sim:.3f})")
+            relabeled_full_diar.append(relabeled_chunk)
+        return relabeled_full_diar
+
     def calc_emb_similarity(self, emb1, emb2, model_type='sb'):
         if model_type == 'sb':   # [1, 1, 192] 
             emb1 = emb1.view(-1).cpu().numpy()
@@ -485,6 +587,7 @@ class PostProcessPipe(BasePipeline):
                     chunk_result.append(((start, end), new_label))
             relabeled.append(chunk_result)    # 청크별 결과를 이중 리스트로 유지
         return relabeled
+
 
 class EMBPipe(BasePipeline):
     '''

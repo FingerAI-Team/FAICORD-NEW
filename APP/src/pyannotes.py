@@ -192,35 +192,6 @@ class PyannotDIAR(Pyannot):
             last_time = time
         return timeline
 
-    def map_speaker_info(self, diar_results, embeddings, threshold=0.65):
-        '''
-        청크들 간 화자 정보를 매핑해줌
-        '''
-        speaker_dict = dict() 
-        speaker_no = -1 
-        for idx, chunk_embedding in enumerate(embeddings): 
-            if idx == 0:   # 첫 청크: 그냥 등록
-                for idx2, speaker_emb in enumerate(chunk_embedding):
-                    speaker_no += 1
-                    speaker_dict[f'speaker_{str(speaker_no).zfill(2)}'] = speaker_emb
-            else:
-                for idx2, speaker_emb in enumerate(chunk_embedding):
-                    best_similarity = -1
-                    best_key = None
-                    for key, value in speaker_dict.items():
-                        emb_similarity = self.calc_emb_similarity(value, speaker_emb)
-                        print(f'emb similarity of {key}-{idx2}, chunk {idx}: {emb_similarity}')
-                        if emb_similarity > best_similarity:
-                            best_similarity = emb_similarity
-                            best_key = key
-                    if best_similarity >= threshold:
-                        print(f'Mapped {idx2} in chunk {idx} to {best_key}')
-                    else:
-                        speaker_no += 1
-                        new_speaker_key = f'speaker_{str(speaker_no).zfill(2)}'
-                        speaker_dict[new_speaker_key] = speaker_emb
-                        print(f'New speaker {new_speaker_key} registered from {idx2} in chunk {idx}')
-
     def save_as_rttm(self, diar_result, output_rttm_path=None, file_name=None):
         '''
         rttm: SPEAKER <file-id> <channel> <start-time> <duration> <NA> <NA> <speaker-id> <NA> <NA>
