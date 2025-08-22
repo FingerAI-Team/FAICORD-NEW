@@ -9,3 +9,7 @@
 *.png
 /APP/pretrained_models
 /APP/git_token/github_token.txt
+*.m4a
+/APP/dataset
+/APP/src/nsnet2_denoiser
+/APP/src/wespeaker
