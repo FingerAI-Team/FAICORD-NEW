@@ -296,7 +296,18 @@ class SummaryPipe(BasePipeline):
     def read_stt_result(self, stt_path):
         with open(stt_path, "r", encoding="utf-8") as f:
             stt_result = json.load(f)
-        return stt_result
+        # start, end 제거하고 speaker + text만 추출
+        dialogue_list = []
+        for item in stt_result:
+            speaker = item.get("speaker")
+            text = item.get("text", "").strip()
+            if not text:
+                continue  # 빈 문자열은 제외
+            dialogue_list.append({
+                "speaker": speaker,
+                "text": text
+            })
+        return dialogue_list
 
     def split_stt_result(self, stt_result, chunk_count=3):
         total_len = len(stt_result)
