@@ -77,15 +77,15 @@ class WhisperSTT(STTModule):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
             audio_segment.export(temp_audio_file.name, format="wav")
             with open(temp_audio_file.name, "rb") as f:
-                try:
+                #try:
                     transcription = self.openai_client.audio.transcriptions.create(
                         model="whisper-1",
                         file=f,
                         language='ko',
                         response_format="verbose_json",
                     )
-                except: 
-                    print(f'audio transcript err')
+                #except: 
+                #    print(f'audio transcript err')
             os.remove(temp_audio_file.name)
         try:
             return transcription.segments

@@ -58,7 +58,7 @@ class FrontendPipe(BasePipeline):
         elif isinstance(audio_file, str) and audio_file.lower().endswith(".mp4"):
             print(f"[INFO] MP4 파일 감지됨 → WAV로 변환 중: {audio_file}")
             audio_file = self.audio_file_processor.mp4_to_wav(audio_file)
-            
+
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file)
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
         print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
@@ -239,23 +239,23 @@ class STTPipe(BasePipeline):
                 start_sample = int(start_sec * sample_rate)
                 end_sample = int(end_sec * sample_rate)
                 segment_waveform = waveform[:, start_sample:end_sample]
-                segments.append((segment_waveform, sample_rate, speaker, start_sec))
+                segments.append((segment_waveform, sample_rate, speaker, start_sec, end_sec))
 
-            def transcribe_segment_safe(segment_waveform, sample_rate, speaker, start_sec, retry=3):
+            def transcribe_segment_safe(segment_waveform, sample_rate, speaker, start_sec, end_sec, retry=3):
                 for attempt in range(retry):
                     try:
                         stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
                         if stt_result:
                             text_result = self.stt_model.extract_text(stt_result, text_filter)
-                            return {'speaker': speaker, 'text': text_result, 'start': start_sec}
+                            return {'speaker': speaker, 'text': text_result, 'start': start_sec, 'end': end_sec}
                     except Exception as e:
                         print(f"[Retry {attempt+1}] Error for speaker {speaker}: {e}")
                         time.sleep(1)
-                return {'speaker': speaker, 'text': None, 'start': start_sec}
+                return {'speaker': speaker, 'text': None, 'start': start_sec, 'end': end_sec}
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(transcribe_segment_safe, seg[0], seg[1], seg[2], seg[3])
+                    executor.submit(transcribe_segment_safe, seg[0], seg[1], seg[2], seg[3], seg[4])
                     for seg in segments
                 ]
                 for future in as_completed(futures):
@@ -265,8 +265,8 @@ class STTPipe(BasePipeline):
                     except Exception as e:
                         print(f"Error during transcription: {e}")
             results.sort(key=lambda x: x['start'])
-            for r in results:
-                del r['start']
+            # for r in results:
+            #    del r['start']
         return results
 
     def extract_only_text(self, segments):

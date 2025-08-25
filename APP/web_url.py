@@ -141,7 +141,6 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         for idx in range(len(stt_results)):
             summary_result = summary_pipe.summarize(openai_summary_model, stt_results[idx], system_prompt=default_system_prompt, subrole_prompt=default_subrole_prompt) 
             chunk_summary += summary_result + '\n\n'
-
         total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary, system_prompt=concat_system_prompt, subrole_prompt='')   
         print(f'Summarize Done !: {time.time() - start}초')
 
