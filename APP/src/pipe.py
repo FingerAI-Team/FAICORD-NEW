@@ -55,7 +55,10 @@ class FrontendPipe(BasePipeline):
         if isinstance(audio_file, str) and audio_file.lower().endswith(".m4a"):
             print(f"[INFO] M4A 파일 감지됨 → WAV로 변환 중: {audio_file}")
             audio_file = self.audio_file_processor.m4a_to_wav(audio_file)
-
+        elif isinstance(audio_file, str) and audio_file.lower().endswith(".mp4"):
+            print(f"[INFO] MP4 파일 감지됨 → WAV로 변환 중: {audio_file}")
+            audio_file = self.audio_file_processor.mp4_to_wav(audio_file)
+            
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file)
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=chunk_length)
         print(f"[DEBUG] Chunk count: {len(chunks)}, chunk_length={chunk_length} sec")
