@@ -546,5 +546,3 @@ class VisualizePipe(BasePipeline):
             - melspectrogram: numpy array of shape (n_mels, time_steps)
         '''
         return self.audio_visualizer.waveform_png_base64(audio_file)
-        
-        
