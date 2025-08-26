@@ -703,6 +703,7 @@ class EMBPipe(BasePipeline):
     def get_xy_tsne(self, emb_array, labels, file_names, as_dict=True):
         return self.emb_visualizer.get_xy_tsne(emb_array, labels=labels, file_names=file_names, as_dict=as_dict)
 
+
 class VisualizePipe(BasePipeline):
     def __init__(self):
         super().__init__()
