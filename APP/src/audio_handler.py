@@ -339,7 +339,10 @@ class AudioVisualizer:
         return {
             "image_base64": b64,
             "media_type": "image/png",
-            "sr": sr, "n_fft": n_fft, "hop_length": hop_length, "n_mels": n_mels,
+            "sr": sr, 
+            "n_fft": n_fft, 
+            "hop_length": hop_length, 
+            "n_mels": n_mels,
         }
 
     def visualize_all(self, y, sr, title_prefix="", file_name=None):
