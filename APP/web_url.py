@@ -10,6 +10,7 @@ import requests
 import markdown
 import logging 
 import uvicorn
+import base64
 import time
 import json
 import os
@@ -227,51 +228,53 @@ def summarize_audio_logic(meeting_log_content, meeting_dir, user_system_prompt, 
             print(f"[Webhook Error] Failed to post to webhook: {e}")
 
 @app.post("/visualize_emb")
-def visualize_emb(req: VisualizeEmbRequest):
-    '''
-    audio_file_list = ['speaker1.wav', 'speaker2.wav', 'speaker3.wav', ... 'speakerN.wav']
-    lable_list = ['SPEAKER_00', 'SPEAKER_00', 'SPEAKER_01', ... , 'SPEAKER_N']
-    '''
-    audio_file_list = req.audio_file_list
-    speaker_label_list = req.label_list
-    if len(audio_file_list) == 0:
-        raise HTTPException(status_code=400, detail="audio_file_list가 비어 있습니다.")
-    if len(audio_file_list) != len(speaker_label_list):
-        raise HTTPException(status_code=400, detail="audio_file_list와 label_list 길이가 다릅니다.")
+async def visualize_emb(
+        audio_files: List[UploadFile] = File(...),       # 오디오 파일 리스트
+        label_list: List[str] = Form(...)                # 라벨 리스트 (Form으로 전달)
+    ):
+    if len(audio_files) == 0:
+        raise HTTPException(status_code=400, detail="audio_files가 비어 있습니다.")
+    if len(audio_files) != len(label_list):
+        raise HTTPException(status_code=400, detail="파일 수와 라벨 수가 다릅니다.")
 
-    missing = [p for p in audio_file_list if not os.path.isfile(p)]
-    if missing:
-        raise HTTPException(status_code=404, detail=f"파일을 찾을 수 없습니다: {missing[:3]}{' ...' if len(missing)>3 else ''}")
-    
     embs = []
-    for p in audio_file_list:
-        v = emb_pipe.get_emb_from_file(p)           # -> np.ndarray shape [D]
-        v = np.asarray(v, dtype=np.float32).ravel() # 안전히 1D로
+    file_names = []
+    for file in audio_files:
+        file_content = await file.read()
+        file_stream = io.BytesIO(file_content)
+
+        file_names.append(file.filename)
+        v = emb_pipe.get_emb_from_file(file_stream)           # -> np.ndarray shape [D]
+        v = np.asarray(v, dtype=np.float32).ravel()           # 안전히 1D로
         embs.append(v)
-    X = np.stack(embs, axis=0)
+    try:
+        X = np.stack(embs, axis=0)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"임베딩 결합 실패: {e}")
+    
     xy_list = emb_pipe.get_xy_tsne(
         X,
-        labels=speaker_label_list,
-        file_names=[os.path.basename(f) for f in audio_file_list],
-        as_dict=True,           # ← 파일/라벨까지 포함한 JSON 레코드로
+        labels=label_list,
+        file_names=file_names,
+        as_dict=True,
         metric="cosine",
         seed=42
     )
     return xy_list
 
 @app.post("/visualize_spectogram")
-def visualize_spectogram(req: MelReq):
-    if not os.path.isfile(req.audio_file):
-        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-    out = visualize_pipe.get_melspectrogram(req.audio_file)
+async def visualize_spectogram(audio_file: UploadFile = File(...)):
+    file_bytes = await audio_file.read()
+    audio_stream = io.BytesIO(file_bytes)
+    out = visualize_pipe.get_melspectrogram(audio_stream)
     # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
     return out
 
 @app.post("/visualize_waveform")
-def visualize_waveform(req: WaveformReq):
-    if not os.path.isfile(req.audio_file):
-        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-    out = visualize_pipe.get_waveform(req.audio_file)
+async def visualize_waveform(audio_file: UploadFile = File(...)):
+    file_bytes = await audio_file.read()
+    audio_stream = io.BytesIO(file_bytes)
+    out = visualize_pipe.get_waveform(audio_stream)
     # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
     return out
 
