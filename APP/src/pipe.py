@@ -5,6 +5,8 @@ from scipy.spatial.distance import cosine
 from collections import defaultdict
 from abc import abstractmethod
 from pydub import AudioSegment
+from datetime import datetime
+from pathlib import Path
 from io import BytesIO
 import numpy as np
 import torch
@@ -110,23 +112,13 @@ class SummaryPipe(BasePipeline):
         openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
         return openai_summary_model
     
-    def convert_to_train_format(input_path=None, target_summary=None, output_path=None):
-        with open(input_path, "r", encoding="utf-8") as f:
-            raw_data = json.load(f)
-        speakers = sorted(list({u["speaker"] for u in raw_data if "speaker" in u}))
-        transcript = [{"speaker": u["speaker"], "text": u["text"].strip()} for u in raw_data if "text" in u]
+    def convert_to_train_format(self, file_path=None, stt_result=None, target_summary=None, output_path=None):
+        speakers = sorted(list({u["speaker"] for u in stt_result if "speaker" in u}))
+        transcript = [{"speaker": u["speaker"], "text": u["text"]} for u in stt_result if "text" in u]
 
-        file_id = Path(input_path).stem
+        file_id = Path(file_path).stem
         date_str = datetime.now().strftime("%Y-%m-%d")
         full_id = f"{file_id}_{date_str}"
-        '''target_summary = (
-            "안건\n"
-            "음성 텍스트 변환 프로젝트 진행 상황\n"
-            "유사도 분석 및 스크립트화 작업\n"
-            "데이터 제공 및 테스트 계획\n"
-            "논의 사항\n"
-            "안건 1: ..."
-        )'''
         target_summary = target_summary if target_summary else "추가 예정"
         output = {
             "id": full_id,
@@ -144,13 +136,14 @@ class SummaryPipe(BasePipeline):
     def read_stt_result(self, stt_path):
         with open(stt_path, "r", encoding="utf-8") as f:
             stt_result = json.load(f)
+
         # start, end 제거하고 speaker + text만 추출
         dialogue_list = []
         for item in stt_result:
             speaker = item.get("speaker")
             text = item.get("text", "")
             if not text:
-                continue  # 빈 문자열은 제외
+                continue    # 빈 문자열은 제외
             dialogue_list.append({
                 "speaker": speaker,
                 "text": text
@@ -167,6 +160,38 @@ class SummaryPipe(BasePipeline):
             chunks.append(stt_result[start:end])
         return chunks  # [초반부, 중반부, 후반부]
 
+    def convert_to_multi_segment_train_samples(self, stt_result, summary_seg_result, target_summary, file_id=None, output_path=None, segment_count=3):
+        speakers = sorted(list({u["speaker"] for u in stt_result if "speaker" in u}))
+        transcript = [{"speaker": u["speaker"], "text": u["text"]} for u in stt_result if "text" in u]
+        segments = self.split_stt_result(stt_result, chunk_count=segment_count)
+       
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        samples = []
+
+        # 1차 요약용 샘플 생성
+        for i, seg in enumerate(segments):
+            seg_lines = "\n".join([f'{u["speaker"]}: {u["text"]}' for u in seg])
+            input_text = f"<|user|>\n아래 전사 블록을 간단히 요약하세요:\n\n{seg_lines}"
+            samples.append({
+                "id": f"{file_id}_seg{i+1}_{date_str}",
+                "input": input_text,
+                "target_summary": summary_seg_result[i]
+            })
+
+        # 2차 통합 요약용 샘플 생성
+        seg_refs = [f"요약 {i+1}: {summary_seg_result[i]}" for i in range(segment_count)]
+        doc_input = "<|user|>\n아래 요약들을 종합하여 회의록을 정리하세요:\n\n" + "\n".join(seg_refs)
+        samples.append({
+            "id": f"{file_id}_doc_{date_str}",
+            "input": doc_input,
+            "target_summary": target_summary 
+        })
+        output_path = Path(output_path)
+        with output_path.open("w", encoding="utf-8") as f:
+            for s in samples:
+                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+        print(f"[✓] {len(samples)}개의 학습 샘플이 저장되었습니다 → {output_path}")
+    
     def summarize(self, summary_model, text, system_prompt=None, subrole_prompt=None):
         '''
         회의록 요약
@@ -178,7 +203,6 @@ class SummaryPipe(BasePipeline):
         '''
         summary_model.set_generation_config()
         summary_model.set_summary_guideline(system_prompt, subrole_prompt)
-        # print('', end='\n\n')
         # print(summary_model.system_role, end='\n\n')
         prompt_template = summary_model.set_prompt_template(text)
         return summary_model.get_response(prompt_template, role=summary_model.system_role, sub_role=summary_model.sub_role)        
