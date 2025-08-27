@@ -4,6 +4,7 @@ from demucs.pretrained import get_model
 from demucs.apply import apply_model
 from pydub import AudioSegment
 from nara_wpe.wpe import wpe
+from typing import BinaryIO
 from io import BytesIO
 import matplotlib.pyplot as plt
 import matplotlib
@@ -16,6 +17,7 @@ import torchaudio
 import subprocess
 import tempfile
 import librosa
+import base64
 import torch
 import io
 import os 
@@ -241,24 +243,24 @@ class AudioVisualizer:
             plt.savefig(file_name, dpi=300)
         plt.close()
 
-    def waveform_png_base64(audio_path: str,
-                        sr: int = 16000,
-                        time_range: tuple[float, float] | None = None,
-                        dpi: int = 200):
+    def waveform_png_base64(self, audio_stream: BinaryIO, sr: int = 16000, time_range: tuple[float, float] | None = None, dpi: int = 200):
         """
-        audio_path를 읽어서 웨이브폼 이미지를 Base64로 반환.
-        - time_range: (start_sec, end_sec) 지정 시 해당 구간만 시각화
+        업로드된 파일 스트림(audio_stream)을 받아,
+        웨이브폼을 이미지(Base64 PNG)로 반환합니다.
+        time_range: (start_sec, end_sec) 범위만 시각화할 경우 지정
         """
-        offset = None
-        duration = None
-        if time_range and len(time_range) == 2:
-            start, end = float(time_range[0]), float(time_range[1])
-            start = max(0.0, start)
-            if end > start:
-                offset = start
-                duration = end - start
+        y, orig_sr = sf.read(audio_stream)
+        if y.ndim == 2:  # stereo → mono
+            y = y.mean(axis=1)
+        if orig_sr != sr:
+            y = librosa.resample(y, orig_sr=orig_sr, target_sr=sr)
 
-        y, sr = librosa.load(audio_path, sr=sr, mono=True, offset=offset, duration=duration)
+        if time_range and len(time_range) == 2:
+            start_sec, end_sec = time_range
+            start_sample = int(max(0.0, start_sec) * sr)
+            end_sample = int(end_sec * sr)
+            if end_sample > start_sample:
+                y = y[start_sample:end_sample]
 
         fig, ax = plt.subplots(figsize=(12, 2.6))
         librosa.display.waveshow(y, sr=sr, ax=ax)
@@ -272,7 +274,6 @@ class AudioVisualizer:
         fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
         plt.close(fig)
         buf.seek(0)
-
         b64 = base64.b64encode(buf.read()).decode("ascii")
         return {
             "image_base64": b64,
@@ -307,41 +308,44 @@ class AudioVisualizer:
             plt.savefig(file_name, dpi=300)
         plt.close()
 
-    def melspec_png_base64(audio_path: str,
-                       sr: int = 16000,
-                       n_fft: int = 1024,
-                       hop_length: int = 256,
-                       n_mels: int = 128,
+    def melspec_png_base64(self, audio_stream: BinaryIO, sr: int = 16000, n_fft: int = 1024, hop_length: int = 256, n_mels: int = 128, 
                        fmin: float = 0.0,
                        fmax: float | None = None,
                        top_db: float = 80.0,
                        power: float = 2.0,
                        dpi: int = 200):
-        y, sr = librosa.load(audio_path, sr=sr, mono=True)
+        """
+        audio_stream: BytesIO 또는 UploadFile.file 등 파일-유사 객체
+        """
+        y, sr_ = sf.read(audio_stream)
+        if y.ndim == 2:
+            y = y.mean(axis=1)  # stereo → mono
+
+        if sr_ != sr:
+            y = librosa.resample(y, orig_sr=sr_, target_sr=sr)
         S = librosa.feature.melspectrogram(
             y=y, sr=sr, n_fft=n_fft, hop_length=hop_length,
             n_mels=n_mels, power=power, fmin=fmin, fmax=fmax
         )
         S_db = librosa.power_to_db(S, ref=np.max, top_db=top_db)
-
         fig, ax = plt.subplots(figsize=(12, 3))
         img = librosa.display.specshow(S_db, sr=sr, hop_length=hop_length,
                                     x_axis='time', y_axis='mel', cmap='magma', ax=ax)
-        cbar = plt.colorbar(img, ax=ax, format="%+2.0f dB")
+        plt.colorbar(img, ax=ax, format="%+2.0f dB")
         ax.set_title("Mel Spectrogram")
         plt.tight_layout()
-
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
         plt.close(fig)
         buf.seek(0)
+
         b64 = base64.b64encode(buf.read()).decode("ascii")
         return {
             "image_base64": b64,
             "media_type": "image/png",
-            "sr": sr, 
-            "n_fft": n_fft, 
-            "hop_length": hop_length, 
+            "sr": sr,
+            "n_fft": n_fft,
+            "hop_length": hop_length,
             "n_mels": n_mels,
         }
 
