@@ -30,7 +30,7 @@ def main(args):
         chunk_summary += summary_result + '\n\n'
     total_summary = summary_pipe.summarize(summary_model, chunk_summary, system_prompt=concat_system_prompt, subrole_prompt='')   
     output_file_name = args.stt_file_name.replace('.json', '_summary.json').replace('/stt/', '/summary/')
-    SummaryPipe.convert_to_train_format(input_path=args.stt_file_name, target_summary=total_summary, output_path=output_file_name)
+    SummaryPipe.convert_to_train_format(file_path=args.stt_file_name, stt_result=stt_result, target_summary=total_summary, output_path=output_file_name)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
