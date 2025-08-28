@@ -50,16 +50,6 @@ with open(os.path.join('./config', "concat_system_prompt.txt"), "r", encoding="u
 with open(os.path.join("./models", 'wespeak_config.json')) as f: 
     emb_config = json.load(f)
 
-class VisualizeEmbRequest(BaseModel):
-    audio_file_list: List[str]
-    label_list: List[str]
-
-class MelReq(BaseModel):
-    audio_file: str
-
-class WaveformReq(BaseModel):
-    audio_file: str
-
 frontend_pipe = FrontendPipe()
 vad_pipe = VADPipe(vad_config)
 diar_pipe = DIARPipe(diar_config)
