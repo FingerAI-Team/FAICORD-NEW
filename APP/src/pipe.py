@@ -245,13 +245,20 @@ class STTPipe(BasePipeline):
                 for attempt in range(retry):
                     try:
                         stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
-                        if stt_result:
-                            text_result = self.stt_model.extract_text(stt_result, text_filter)
-                            return {'speaker': speaker, 'text': text_result, 'start': start_sec, 'end': end_sec}
+                        if not stt_result:
+                            raise ValueError("Empty STT result")
+                        text_result = self.stt_model.extract_text(stt_result, text_filter)
+                        if isinstance(text_result, str):
+                            text_result = text_result.replace('\n', ' ').strip()
+                        else:
+                            text_result = (str(text_result).strip() if text_result is not None else None)
+                        if not text_result:
+                            raise ValueError("Empty transcription text")
+                        return {'speaker': speaker, 'text': text_result, 'start': start_sec, 'end': end_sec}
                     except Exception as e:
                         print(f"[Retry {attempt+1}] Error for speaker {speaker}: {e}")
                         time.sleep(1)
-                return {'speaker': speaker, 'text': None, 'start': start_sec, 'end': end_sec}
+                return None
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
@@ -261,12 +268,18 @@ class STTPipe(BasePipeline):
                 for future in as_completed(futures):
                     try:
                         result = future.result()
+                        if not result or not isinstance(result, dict):
+                            continue
+                        text = result.get('text')
+                        if isinstance(text, str):
+                            text = text.strip()
+                        if not text:
+                            continue
+                        result['text'] = text  # 정리한 텍스트로 덮어쓰기
                         results.append(result)
                     except Exception as e:
                         print(f"Error during transcription: {e}")
             results.sort(key=lambda x: x['start'])
-            # for r in results:
-            #    del r['start']
         return results
 
     def extract_only_text(self, segments):
