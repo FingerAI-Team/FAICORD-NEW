@@ -168,6 +168,7 @@ class DIARPipe(BasePipeline):
             vad_diar = self.diar_model.split_diar_result(vad_diar, chunk_offset=self.chunk_offset)
             filtered_diar = self.diar_model.filter_filler(vad_diar)
             filtered_diar = self.diar_model.filter_unknown(filtered_diar)
+            filtered_diar = self.diar_model.remove_fully_contained_segments(filtered_diar)
             non_overlapped_diar = [self.diar_model.remove_overlap(diar_result) for diar_result in filtered_diar]
             return filtered_diar, non_overlapped_diar
 
@@ -203,6 +204,7 @@ class DIARPipe(BasePipeline):
                         continue
                     rttm_line = f"SPEAKER {save_file_name} 1 {abs_start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n"
                     f.write(rttm_line)    
+
 
 class STTPipe(BasePipeline):
     def __init__(self, whisper_api, generation_config):

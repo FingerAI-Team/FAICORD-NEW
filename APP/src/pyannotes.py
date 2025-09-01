@@ -5,6 +5,7 @@ from pyannote.audio import Audio
 from pyannote.core import Segment
 from collections import defaultdict
 from pydub import AudioSegment
+from typing import List, Dict, Tuple
 from pathlib import Path
 from io import BytesIO
 import numpy as np 
@@ -138,6 +139,30 @@ class PyannotDIAR(Pyannot):
                 if duration < filter_duration: 
                     diar_result[idx2] = ((time_s, time_e), 'filler')
         return diar_results
+
+    def remove_fully_contained_segments(self, segments: List[List[Tuple[Tuple[float, float], str]]]) -> List[List[Tuple[Tuple[float, float], str]]]:
+        """
+        chunk 단위 diar 리스트에서, 완전히 포함된 발화 제거
+        """
+        updated = []
+        for diar in segments:
+            # ((start, end), speaker) → dict로 변환
+            seg_dicts = [{"start": s, "end": e, "speaker": spk} for ((s, e), spk) in diar]
+            kept = []
+            for i, seg in enumerate(seg_dicts):
+                s1, e1 = seg["start"], seg["end"]
+                fully_contained = False
+                for j, other in enumerate(seg_dicts):
+                    if i == j:
+                        continue
+                    s2, e2 = other["start"], other["end"]
+                    if s2 <= s1 and e1 <= e2:
+                        fully_contained = True
+                        break
+                if not fully_contained:
+                    kept.append(((s1, e1), seg["speaker"]))
+            updated.append(kept)
+        return updated
 
     def filter_unknown(self, diar_result, chunk_offset=300, min_segments=3, min_avg_duration=1.5):
         """
