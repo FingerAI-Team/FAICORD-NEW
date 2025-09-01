@@ -43,11 +43,16 @@ def main(args):
     clean_audio = frontend_pipe.process_audio(args.file_name, chunk_length=args.chunk_length, deverve=True)
     print(f'cleanse time: {time.time() - start}')
     vad_result = vad_pipe.get_vad_timestamp(clean_audio)
-    diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
-    processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
-    # relabeled_diar = postprocess_pipe.relabel_nonoverlapped_labels(args.file_name, non_overlapped_diar)
+    if args.file_name.endswith('.m4a'):
+        wav_file_name = args.file_name.replace('.m4a', '.wav')
+        diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)   # emb 값 사용 
+        processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
+        chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
+    else:
+        diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
+        processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok 
+        chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
     
-    chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
     label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
     # print(label_mapping_dict)
     
