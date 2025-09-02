@@ -103,10 +103,11 @@ class SummaryPipe(BasePipeline):
     '''
     회의록 요약 파이프라인
     '''
-    def __init__(self, config, api_key):
+    def __init__(self, config=None, api_key=None):
         super().__init__()
-        self.config = config
-        self.api_key = api_key
+        if api_key != None:
+            self.config = config   
+            self.api_key = api_key
 
     def set_openai_client(self):
         openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
