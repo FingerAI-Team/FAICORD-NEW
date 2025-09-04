@@ -113,11 +113,26 @@ class SummaryPipe(BasePipeline):
         openai_summary_model = LLMOpenAI(config=self.config, api_key=self.api_key)
         return openai_summary_model
     
-    def build_summary_prompt(self, base_prompt, stt_dialogues: list[dict]) -> str:
+    def build_total_summary_prompt(self, base_prompt, stt_dialogues: list[dict]) -> str:
         dialogue_str = "\n".join(
             f'{item["speaker"]}: {item["text"].strip()}' for item in stt_dialogues if item.get("text")
         )
         return f"{base_prompt.strip()}\n\n---\n\n아래는 회의 대화록 전체입니다:\n\n{dialogue_str}"
+
+    def build_chunk_summary_prompt(self, system_prompt, subrole_prompt, stt_dialogues: list[dict]) -> str:
+        dialogue_str = "\n".join(
+            f'{item["speaker"]}: {item["text"].strip()}'
+            for item in stt_dialogues
+            if item.get("text", "").strip()
+        )
+        full_prompt = f"""{system_prompt}
+            ---
+            {subrole_prompt}
+            ---
+            아래는 회의 발화 데이터입니다:
+            {dialogue_str}
+        """
+        return full_prompt
 
     def convert_to_train_format(self, file_path=None, stt_result=None, target_summary=None, output_path=None):
         speakers = sorted(list({u["speaker"] for u in stt_result if "speaker" in u}))
