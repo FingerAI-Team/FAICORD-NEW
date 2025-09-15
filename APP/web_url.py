@@ -102,7 +102,7 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
         print(f'Diarization Done !: {time.time() - start}초')
         if webhook_url:
-            requests.post('http://faicord-backend:8080/api/status/meetings/status-update', json={
+            requests.post('http://localhost:15888/api/status/meetings/status-update', json={
                 "statusCode": "003",
                 "meetingId": meeting_dir
             })
@@ -113,7 +113,7 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
         print(f'STT Done !: {time.time() - start}초')
         if webhook_url:
-            requests.post('http://faicord-backend:8080/api/status/meetings/status-update', json={
+            requests.post('http://localhost:15888/api/status/meetings/status-update', json={
                 "statusCode": "004",
                 "meetingId": meeting_dir,
             })
@@ -269,4 +269,4 @@ async def visualize_waveform(audio_file: UploadFile = File(...)):
     return out
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=9050, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8081, reload=True)
