@@ -14,6 +14,7 @@ import base64
 import time
 import json
 import os
+import io 
 
 load_dotenv()
 
@@ -49,6 +50,16 @@ with open(os.path.join('./config', "concat_system_prompt.txt"), "r", encoding="u
 
 with open(os.path.join("./models", 'wespeak_config.json')) as f: 
     emb_config = json.load(f)
+
+class VisualizeEmbRequest(BaseModel):
+    audio_file_list: List[str]
+    label_list: List[str]
+
+class MelReq(BaseModel):
+    audio_file: str
+
+class WaveformReq(BaseModel):
+    audio_file: str
 
 frontend_pipe = FrontendPipe()
 vad_pipe = VADPipe(vad_config)
@@ -95,14 +106,20 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         vad_result = vad_pipe.get_vad_timestamp(clean_audio)
 
         diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)
+        print(f'[DEBUG] get_diar done !')
         processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)
+        print(f'[DEBUG] diar preprocess done !')
+        print(f'[DEBUG] non overlapped diar: {len(non_overlapped_diar)}, {non_overlapped_diar[0]}')
         chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
+        print(f'[DEBUG] get chunk emb array done !')
         label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
+        print(f'[DEBUG] build label mapping done !') 
         full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
+        print(f'[DEBUG] apply label to full diar done !')
         final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
         print(f'Diarization Done !: {time.time() - start}초')
         if webhook_url:
-            requests.post('http://localhost:15888/api/status/meetings/status-update', json={
+            requests.post('http://faicord-backend:8080/api/status/meetings/status-update', json={
                 "statusCode": "003",
                 "meetingId": meeting_dir
             })
@@ -113,7 +130,7 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
         stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
         print(f'STT Done !: {time.time() - start}초')
         if webhook_url:
-            requests.post('http://localhost:15888/api/status/meetings/status-update', json={
+            requests.post('http://faicord-backend:8080/api/status/meetings/status-update', json={
                 "statusCode": "004",
                 "meetingId": meeting_dir,
             })
@@ -198,7 +215,7 @@ def summarize_audio_logic(meeting_log_content, meeting_dir, user_system_prompt, 
         chunk_summary += summary_result + '\n\n'
     
     # Markdown & HTML 저장
-    total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary, system_prompt=default_system_prompt, subrole_prompt='')   
+    total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary, system_prompt=concat_system_prompt, subrole_prompt='')   
     markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
     save_file_name = f"{job_id}.html"
     html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
@@ -247,8 +264,6 @@ async def visualize_emb(
         labels=label_list,
         file_names=file_names,
         as_dict=True,
-        metric="cosine",
-        seed=42
     )
     return xy_list
 
@@ -269,4 +284,4 @@ async def visualize_waveform(audio_file: UploadFile = File(...)):
     return out
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8081, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=9050, reload=True)

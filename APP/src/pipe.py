@@ -113,12 +113,15 @@ class DIARPipe(BasePipeline):
                 num_speakers=num_speakers,
                 return_embeddings=return_embeddings
             )
+            if diar_result is None or emb:
+                print(f"[WARN] Empty result at chunk {idx}")
         return idx, diar_result, emb
     
     def get_diar(self, audio_file, num_speakers=None, return_embeddings=False):
         diar_pipe = self.diar_model.load_pipeline_from_pretrained(self.diar_config)
         audio_seg = self.audio_file_processor.audiofile_to_AudioSeg(audio_file) 
         chunks = self.audio_file_processor.chunk_audio(audio_seg, chunk_length=self.chunk_offset)
+        print(f"Chunk count: {len(chunks)}")
         results = [None] * len(chunks)
         emb_results = [None] * len(chunks)
         with ThreadPoolExecutor(max_workers=4) as executor:  # 적절히 조절
@@ -168,7 +171,6 @@ class DIARPipe(BasePipeline):
             vad_diar = self.diar_model.split_diar_result(vad_diar, chunk_offset=self.chunk_offset)
             filtered_diar = self.diar_model.filter_filler(vad_diar)
             filtered_diar = self.diar_model.filter_unknown(filtered_diar)
-            filtered_diar = self.diar_model.remove_fully_contained_segments(filtered_diar)
             non_overlapped_diar = [self.diar_model.remove_overlap(diar_result) for diar_result in filtered_diar]
             return filtered_diar, non_overlapped_diar
 
@@ -204,7 +206,6 @@ class DIARPipe(BasePipeline):
                         continue
                     rttm_line = f"SPEAKER {save_file_name} 1 {abs_start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n"
                     f.write(rttm_line)    
-
 
 class STTPipe(BasePipeline):
     def __init__(self, whisper_api, generation_config):
@@ -243,7 +244,7 @@ class STTPipe(BasePipeline):
                 segment_waveform = waveform[:, start_sample:end_sample]
                 segments.append((segment_waveform, sample_rate, speaker, start_sec, end_sec))
 
-            def transcribe_segment_safe(segment_waveform, sample_rate, speaker, start_sec, end_sec, retry=3):
+            def transcribe_segment_safe(segment_waveform, sample_rate, speaker, start_sec, end_sec, retry=1):
                 for attempt in range(retry):
                     try:
                         stt_result = self.stt_model.transcribe_text_api((segment_waveform, sample_rate))
@@ -259,7 +260,7 @@ class STTPipe(BasePipeline):
                         return {'speaker': speaker, 'text': text_result, 'start': start_sec, 'end': end_sec}
                     except Exception as e:
                         print(f"[Retry {attempt+1}] Error for speaker {speaker}: {e}")
-                        time.sleep(1)
+                        time.sleep(0.5)
                 return None
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -435,6 +436,9 @@ class PostProcessPipe(BasePipeline):
             emb_result = self.wsemb.get_embeddings_from_diar(
                 self.emb_model, file_name, diar, chunk_offset=idx*self.chunk_offset
             )
+            if not emb_result: 
+                print(f"[WARN] No embeddings extracted at chunk {idx}")
+                continue
             emb_array = np.vstack([emb for (_, _, emb) in emb_result])
             original_labels = [speaker for (_, speaker, _) in emb_result]
             segments = [(start, end) for ((start, end), _, _) in emb_result]
@@ -452,7 +456,6 @@ class PostProcessPipe(BasePipeline):
         '''
         speaker_registry = {}  # global_label: centroid
         chunkwise_mapping = {}
-
         def _l2(x):
             norm = np.linalg.norm(x)
             return x if norm == 0 else x / norm

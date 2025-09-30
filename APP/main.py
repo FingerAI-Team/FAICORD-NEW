@@ -18,16 +18,12 @@ def main(args):
 
     vad_config = os.path.join(args.model_config_path, 'pyannote_vad_config.yaml')
     diar_config = os.path.join(args.model_config_path, 'pyannote_diarization_config.yaml')
+    with open(os.path.join('./config', "default_system_prompt.txt"), "r", encoding="utf-8") as f:
+        system_prompt = f.read()
     
-    with open('./config/default_system_prompt.txt', "r", encoding="utf-8") as f:
-        default_system_prompt = f.read()
-
-    with open('./config/default_subrole_prompt.txt', "r", encoding="utf-8") as f:
-        default_subrole_prompt = f.read()
-
-    with open(os.path.join('./config', "concat_system_prompt.txt"), "r", encoding="utf-8") as f:
-        concat_system_prompt = f.read()
-
+    with open(os.path.join('./config', "default_subrole_prompt.txt"), "r", encoding="utf-8") as f:
+        subrole_prompt = f.read()
+    
     frontend_pipe = FrontendPipe()
     vad_pipe = VADPipe(vad_config)
     diar_pipe = DIARPipe(diar_config)
@@ -43,16 +39,11 @@ def main(args):
     clean_audio = frontend_pipe.process_audio(args.file_name, chunk_length=args.chunk_length, deverve=True)
     print(f'cleanse time: {time.time() - start}')
     vad_result = vad_pipe.get_vad_timestamp(clean_audio)
-    if args.file_name.endswith('.m4a'):
-        wav_file_name = args.file_name.replace('.m4a', '.wav')
-        diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)   # emb 값 사용 
-        processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
-        chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
-    else:
-        diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
-        processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok 
-        chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
+    diar_result, _ = diar_pipe.get_diar(args.file_name, return_embeddings=False)   # emb 값 사용 x 
+    processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)    # ok. 
+    # relabeled_diar = postprocess_pipe.relabel_nonoverlapped_labels(args.file_name, non_overlapped_diar)
     
+    chunk_emb_array = postprocess_pipe.get_chunk_emb_array(args.file_name, non_overlapped_diar)
     label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
     # print(label_mapping_dict)
     
@@ -69,22 +60,15 @@ def main(args):
     with open(os.path.join('./dataset/stt/', save_file_name), "w", encoding="utf-8") as f:
         json.dump(stt_result, f, ensure_ascii=False, indent=2)
     
-    stt_results = summary_pipe.split_stt_result(stt_result, chunk_count=3)
-    chunk_summary = '' 
-    for idx in range(len(stt_results)):
-        summary_result = summary_pipe.summarize(openai_summary_model, stt_results[idx], system_prompt=default_system_prompt, subrole_prompt=default_subrole_prompt) 
-        chunk_summary += summary_result + '\n\n'
-
-    total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary, system_prompt=concat_system_prompt, subrole_prompt='')   
-    markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
-    save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '_summary.html'
+    summary_result = summary_pipe.summarize(openai_summary_model, stt_result, system_prompt=system_prompt, subrole_prompt=subrole_prompt) 
+    print(f'Summarize Done !: {time.time() - start}초')
+    markdown_text = summary_pipe.convert_minutes_to_markdown(summary_result)
+    save_file_name = 'faicord_' + args.file_name.split('/')[-1].split('.')[0] + '_summary.html'    
     html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
-
-    output_path = os.path.join("./dataset/summary/", save_file_name)
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(os.path.join('./dataset/summary/', save_file_name), "w", encoding="utf-8") as f:
         f.write(html_text)
- 
     
+
 if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
     cli_parser.add_argument('--whisper_config_path', type=str, default='./config')

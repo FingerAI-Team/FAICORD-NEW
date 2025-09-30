@@ -5,7 +5,6 @@ from pyannote.audio import Audio
 from pyannote.core import Segment
 from collections import defaultdict
 from pydub import AudioSegment
-from typing import List, Dict, Tuple
 from pathlib import Path
 from io import BytesIO
 import numpy as np 
@@ -82,19 +81,25 @@ class PyannotDIAR(Pyannot):
         return 1 - cosine(emb1, emb2)    # cosine()은 distance니까 1 - distance
     
     def get_diar_result(self, pipeline, audio_file, num_speakers=None, min_duration=None, return_embeddings=False):
+        # print(f"[DEBUG] Processing file: {audio_file}")
         diarization = pipeline(audio_file, num_speakers=num_speakers, return_embeddings=return_embeddings)
         diar_result = []
         embeddings = None
         seen_segments = set()
         if return_embeddings == False:
+            seg_count = 0
             for segment, _, speaker in diarization.itertracks(yield_label=True):
                 start_time = segment.start
                 end_time = segment.end
                 duration = end_time - start_time
+                seg_count += 1
                 segment_key = (round(start_time, 3), round(end_time, 3), speaker)
                 if segment_key not in seen_segments:
                     diar_result.append([(start_time, end_time), speaker])
                     seen_segments.add(segment_key)
+                    # print(f"[DEBUG] Segment {seg_count}: {start_time:.2f}–{end_time:.2f}s, dur={duration:.2f}, speaker={speaker}")
+            if seg_count == 0:
+                print(f"[WARN] No diarization segments found in {audio_file}")
         else:
             embeddings = diarization[1]
             for segment, _, speaker in diarization[0].itertracks(yield_label=True):
@@ -139,30 +144,6 @@ class PyannotDIAR(Pyannot):
                 if duration < filter_duration: 
                     diar_result[idx2] = ((time_s, time_e), 'filler')
         return diar_results
-
-    def remove_fully_contained_segments(self, segments: List[List[Tuple[Tuple[float, float], str]]]) -> List[List[Tuple[Tuple[float, float], str]]]:
-        """
-        chunk 단위 diar 리스트에서, 완전히 포함된 발화 제거
-        """
-        updated = []
-        for diar in segments:
-            # ((start, end), speaker) → dict로 변환
-            seg_dicts = [{"start": s, "end": e, "speaker": spk} for ((s, e), spk) in diar]
-            kept = []
-            for i, seg in enumerate(seg_dicts):
-                s1, e1 = seg["start"], seg["end"]
-                fully_contained = False
-                for j, other in enumerate(seg_dicts):
-                    if i == j:
-                        continue
-                    s2, e2 = other["start"], other["end"]
-                    if s2 <= s1 and e1 <= e2:
-                        fully_contained = True
-                        break
-                if not fully_contained:
-                    kept.append(((s1, e1), seg["speaker"]))
-            updated.append(kept)
-        return updated
 
     def filter_unknown(self, diar_result, chunk_offset=300, min_segments=3, min_avg_duration=1.5):
         """
