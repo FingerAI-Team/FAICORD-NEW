@@ -50,10 +50,6 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
 
 # 2. 가상환경 복사 및 환경 설정
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:$PATH"
-COPY . .
-EXPOSE 8081
-# CMD ["sleep", "infinity"]
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081", "--reload"]
+
+CMD ["sleep", "infinity"]
