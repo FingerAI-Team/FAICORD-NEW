@@ -283,5 +283,9 @@ async def visualize_waveform(audio_file: UploadFile = File(...)):
     # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
     return out
 
+@app.get("/ping")
+def ping():
+    return {"status":"ok"}
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=9050, reload=True)
