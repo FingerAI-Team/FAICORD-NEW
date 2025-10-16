@@ -288,23 +288,26 @@ async def upload_audio_app(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     file_name: Optional[str] = Form(None),
-    meeting_date: Optional[str] = Form(None),   # 예: "2025-10-16"
-    topic: Optional[str] = Form(None),          # 회의 주제
-    participants: Optional[str] = Form(None),   # 쉼표로 구분된 이름 목록 등
+    meeting_date: Optional[str] = Form(None),
+    topic: Optional[str] = Form(None),
+    participants: Optional[str] = Form(None),
 ):
     try:
-        # 1️⃣ 파일 저장 경로 설정
-        save_dir = "./uploaded_audios"
+        save_dir = "/app/uploaded_audios"
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, file.filename)
 
-        # 2️⃣ 파일 저장
+        print(f"📁 Saving file: {save_path}")
         with open(save_path, "wb") as f:
-            f.write(await file.read())
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
 
-        logger.info(f"[UPLOAD] file={file.filename}, date={meeting_date}, topic={topic}, participants={participants}")
+        print(f"✅ Upload complete: {file.filename}")
+        print(f"📅 Date={meeting_date}, 🗂 Topic={topic}, 👥 Participants={participants}")
 
-        # 3️⃣ Background task로 실제 처리 로직 실행
         background_tasks.add_task(
             process_audio_logic,
             file_name=file.filename,
@@ -313,11 +316,14 @@ async def upload_audio_app(
             topic=topic,
             participants=participants
         )
+        print("🚀 Background task queued successfully")
         return {"status": "success", "message": "Audio uploaded and processing started."}
     except Exception as e:
-        logger.error(f"Upload error: {e}")
+        import traceback
+        logger.error(f"❌ Upload failed: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 @app.get("/ping")
 def ping():
     return {"status":"ok"}
