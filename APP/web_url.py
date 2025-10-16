@@ -320,8 +320,8 @@ async def upload_audio_app(
         return {"status": "success", "message": "Audio uploaded and processing started."}
     except Exception as e:
         import traceback
-        logger.error(f"❌ Upload failed: {e}")
-        logger.error(traceback.format_exc())
+        print(f"❌ Upload failed: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/ping")
