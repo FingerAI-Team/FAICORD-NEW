@@ -283,6 +283,41 @@ async def visualize_waveform(audio_file: UploadFile = File(...)):
     # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
     return out
 
+@app.post("/upload_audio_app")
+async def upload_audio_app(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    file_name: Optional[str] = Form(None),
+    meeting_date: Optional[str] = Form(None),   # 예: "2025-10-16"
+    topic: Optional[str] = Form(None),          # 회의 주제
+    participants: Optional[str] = Form(None),   # 쉼표로 구분된 이름 목록 등
+):
+    try:
+        # 1️⃣ 파일 저장 경로 설정
+        save_dir = "./uploaded_audios"
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, file.filename)
+
+        # 2️⃣ 파일 저장
+        with open(save_path, "wb") as f:
+            f.write(await file.read())
+
+        logger.info(f"[UPLOAD] file={file.filename}, date={meeting_date}, topic={topic}, participants={participants}")
+
+        # 3️⃣ Background task로 실제 처리 로직 실행
+        background_tasks.add_task(
+            process_audio_logic,
+            file_name=file.filename,
+            meeting_dir=save_dir,
+            meeting_date=meeting_date,
+            topic=topic,
+            participants=participants
+        )
+        return {"status": "success", "message": "Audio uploaded and processing started."}
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/ping")
 def ping():
     return {"status":"ok"}
