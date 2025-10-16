@@ -293,7 +293,7 @@ async def upload_audio_app(
     participants: Optional[str] = Form(None),
 ):
     try:
-        save_dir = "/app/uploaded_audios"
+        save_dir = "/faicord/dataset/app/audio"
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, file.filename)
 
@@ -307,16 +307,6 @@ async def upload_audio_app(
 
         print(f"✅ Upload complete: {file.filename}")
         print(f"📅 Date={meeting_date}, 🗂 Topic={topic}, 👥 Participants={participants}")
-
-        background_tasks.add_task(
-            process_audio_logic,
-            file_name=file.filename,
-            meeting_dir=save_dir,
-            meeting_date=meeting_date,
-            topic=topic,
-            participants=participants
-        )
-        print("🚀 Background task queued successfully")
         return {"status": "success", "message": "Audio uploaded and processing started."}
     except Exception as e:
         import traceback
