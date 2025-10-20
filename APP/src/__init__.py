@@ -5,3 +5,4 @@ from .embeddings import SBEMB, WSEMB, EMBVisualizer
 from .clusters import KNNCluster
 from .llms import LLMOpenAI
 from .pipe import FrontendPipe, VADPipe, DIARPipe, STTPipe, SummaryPipe, PostProcessPipe, EMBPipe, VisualizePipe
+from .progress_handler import ProgressBroker
