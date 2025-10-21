@@ -208,7 +208,6 @@ async def upload_audio_app(
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
     
-
 @app.post("/process_audio_app")
 async def process_audio_app(
     background_tasks: BackgroundTasks,
@@ -251,10 +250,12 @@ async def process_audio_app_logic(
         final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
         rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
         diar_pipe.save_merged_rttm(final_diar, rttm_path)
+        print(f'DIAR Done !: {time.time() - start}초')
         await broker.publish(meeting_dir, {"code": "004", "stage": "RTTM", "message": "rttm saved", "path": rttm_path})
 
         diar_result = stt_pipe.read_rttm(rttm_path)
         stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
+        print(f'STT Done !: {time.time() - start}초')
         await broker.publish(meeting_dir, {"code": "005", "stage": "STT", "message": "stt done"})
 
         stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
@@ -276,6 +277,7 @@ async def process_audio_app_logic(
         total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary,
                                                system_prompt=concat_system_prompt, subrole_prompt='')
         markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
+        print(f'Summarize Done !: {time.time() - start}초')
         summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
         os.makedirs(summary_dir, exist_ok=True)
         save_file_name = f'summary.html'
