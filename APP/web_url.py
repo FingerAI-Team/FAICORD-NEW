@@ -207,6 +207,7 @@ async def upload_audio_app(
         print(f"❌ Upload failed: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @app.post("/process_audio_app")
 async def process_audio_app(
@@ -248,7 +249,7 @@ async def process_audio_app_logic(
         label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
         full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
         final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-        rttm_path = wav_file_name.replace('/audio', '/rttm').replace('.wav', '.rttm')
+        rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
         diar_pipe.save_merged_rttm(final_diar, rttm_path)
         await broker.publish(meeting_dir, {"code": "004", "stage": "RTTM", "message": "rttm saved", "path": rttm_path})
 
@@ -256,7 +257,7 @@ async def process_audio_app_logic(
         stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
         await broker.publish(meeting_dir, {"code": "005", "stage": "STT", "message": "stt done"})
 
-        stt_dir = os.path.join(app_data_dir, 'stt', meeting_dir)
+        stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
         os.makedirs(stt_dir, exist_ok=True)
         stt_file_name = os.path.join(stt_dir, 'stt.json')
         with open(stt_file_name, "w", encoding="utf-8") as f:
@@ -275,7 +276,7 @@ async def process_audio_app_logic(
         total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary,
                                                system_prompt=concat_system_prompt, subrole_prompt='')
         markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
-        summary_dir = os.path.join(app_data_dir, 'summary', meeting_dir)
+        summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
         os.makedirs(summary_dir, exist_ok=True)
         save_file_name = f'summary.html'
         html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
@@ -396,36 +397,6 @@ async def visualize_waveform(audio_file: UploadFile = File(...)):
     # 프론트: <img src={"data:" + out["media_type"] + ";base64," + out["image_base64"]} />
     return out
 
-@app.post("/upload_audio_app")
-async def upload_audio_app(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    file_name: Optional[str] = Form(None),
-    meeting_date: Optional[str] = Form(None),
-    topic: Optional[str] = Form(None),
-    participants: Optional[str] = Form(None),
-):
-    try:
-        save_dir = "/faicord/dataset/app/audio"
-        os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, file.filename)
-
-        print(f"📁 Saving file: {save_path}")
-        with open(save_path, "wb") as f:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                f.write(chunk)
-
-        print(f"✅ Upload complete: {file.filename}")
-        print(f"📅 Date={meeting_date}, 🗂 Topic={topic}, 👥 Participants={participants}")
-        return {"status": "success", "message": "Audio uploaded and processing started."}
-    except Exception as e:
-        import traceback
-        print(f"❌ Upload failed: {e}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/ping")
 def ping():
