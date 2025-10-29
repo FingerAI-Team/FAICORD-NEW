@@ -1,4 +1,4 @@
-from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe, EMBPipe, VisualizePipe, ProgressBroker
+from src import FrontendPipe, VADPipe, DIARPipe, PostProcessPipe, STTPipe, SummaryPipe, EMBPipe, VisualizePipe
 from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -69,7 +69,6 @@ diar_pipe = DIARPipe(diar_config)
 emb_pipe = EMBPipe(emb_config)
 postprocess_pipe = PostProcessPipe()
 visualize_pipe = VisualizePipe()
-broker = ProgressBroker()
 
 whisper_api = os.getenv('OPENAI_API')
 stt_pipe = STTPipe(whisper_api=whisper_api, generation_config=generation_config)
@@ -213,82 +212,115 @@ async def process_audio_app(
     background_tasks: BackgroundTasks,
     meeting_dir: Optional[str] = Form(None),
     file_name: Optional[str] = Form(None),
+    step: Optional[str] = Form(None),
 ):
-    print(f'file_name: {file_name}')
-    logger.info(f"[{file_name}]")
+    print(f'file_name: {file_name}, step: {step}')
+    logger.info(f"[{file_name}] step: {step}")
     try:
-        # Background task 등록
+        # 백그라운드에서 처리 시작
         background_tasks.add_task(
             process_audio_app_logic,
             file_name=file_name,
-            meeting_dir=meeting_dir
+            meeting_dir=meeting_dir,
+            step=step
         )
-        return {"status": "success", "message": "Audio processing started."}
+        return {
+            "status": "success", 
+            "message": f"Audio processing started for step: {step or 'all'}",
+            "step": step
+        }
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     
-async def process_audio_app_logic(
-    file_name: str, meeting_dir: str
+def process_audio_app_logic(
+    file_name: str, meeting_dir: str, step: Optional[str] = None
 ):
     start = time.time()
+    audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
+    wav_file_name = audio_file_path.replace('.m4a', '.wav')
     try:
-        await broker.publish(meeting_dir, {"code": "001", "stage": "START", "message": "processing started"})
-        audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
-        clean_audio = frontend_pipe.process_audio(audio_file_path, chunk_length=300, deverve=True)
-        await broker.publish(meeting_dir, {"code": "002", "stage": "FRONTEND", "message": "audio cleaned"})
+        if not step or step == "preprocess":
+            print(f"[{meeting_dir}] Starting audio preprocessing...")
+            logger.info(f"[{meeting_dir}] Audio preprocessing started")
+            clean_audio = frontend_pipe.process_audio(audio_file_path, chunk_length=300, deverve=True)
+            vad_result = vad_pipe.get_vad_timestamp(clean_audio)
+            print(f'[{meeting_dir}] Audio preprocessing completed: {time.time() - start}초')
+            logger.info(f"[{meeting_dir}] Audio preprocessing completed in {time.time() - start:.2f}초")
+            if step == "preprocess":
+                return
 
-        wav_file_name = audio_file_path.replace('.m4a', '.wav')
-        vad_result = vad_pipe.get_vad_timestamp(clean_audio)
+        # Step 2: SPEAKER (화자 분리)
+        if not step or step == "speaker":
+            print(f"[{meeting_dir}] Starting speaker diarization...")
+            logger.info(f"[{meeting_dir}] Speaker diarization started")
+            diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)
+            processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)
+            chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
+            label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
+            full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
+            final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
+            rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
+            diar_pipe.save_merged_rttm(final_diar, rttm_path)
+            print(f'[{meeting_dir}] Speaker Diarization Done !: {time.time() - start}초')
+            logger.info(f"[{meeting_dir}] Speaker diarization completed in {time.time() - start:.2f}초")
+            if step == "speaker":
+                return
 
-        diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)
-        await broker.publish(meeting_dir, {"code": "003", "stage": "DIAR", "message": "diarization done"})
+        # Step 3: TRANSCRIPTION (음성 인식)
+        if not step or step == "transcription":
+            print(f"[{meeting_dir}] Starting speech transcription...")
+            logger.info(f"[{meeting_dir}] Speech transcription started")
+            diar_result = stt_pipe.read_rttm(rttm_path)
+            stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
+            print(f'[{meeting_dir}] Transcription Done !: {time.time() - start}초')
+            
+            stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
+            os.makedirs(stt_dir, exist_ok=True)
+            stt_file_name = os.path.join(stt_dir, 'stt.json')
+            with open(stt_file_name, "w", encoding="utf-8") as f:
+                json.dump(stt_result, f, ensure_ascii=False, indent=2)
+            
+            logger.info(f"[{meeting_dir}] Speech transcription completed in {time.time() - start:.2f}초")
+            if step == "transcription":
+                return
 
-        processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)
-        chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
-        label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
-        full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
-        final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-        rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
-        diar_pipe.save_merged_rttm(final_diar, rttm_path)
-        print(f'DIAR Done !: {time.time() - start}초')
-        await broker.publish(meeting_dir, {"code": "004", "stage": "RTTM", "message": "rttm saved", "path": rttm_path})
+        # Step 4: SUMMARY (요약)
+        if not step or step == "summary":
+            print(f"[{meeting_dir}] Starting summary generation...")
+            logger.info(f"[{meeting_dir}] Summary generation started")
+            stt_result_loaded = summary_pipe.read_stt_result(stt_file_name)
+            stt_results = summary_pipe.split_stt_result(stt_result_loaded, chunk_count=3)
+            chunk_summary = ""
+            for idx in range(len(stt_results)):
+                summary_result = summary_pipe.summarize(openai_summary_model, stt_results[idx],
+                                                        system_prompt=default_system_prompt,
+                                                        subrole_prompt=default_subrole_prompt)
+                chunk_summary += summary_result + '\n\n'
+                print(f"[{meeting_dir}] Part {idx+1}/3 summarized")
+            
+            total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary,
+                                                   system_prompt=concat_system_prompt, subrole_prompt='')
+            markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
+            print(f'[{meeting_dir}] Summary Done !: {time.time() - start}초')
+            summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
+            os.makedirs(summary_dir, exist_ok=True)
+            save_file_name = f'summary.html'
+            html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
+            summary_file_path = os.path.join(summary_dir, save_file_name)
+            with open(summary_file_path, "w", encoding="utf-8") as f:
+                f.write(html_text)
+            
+            logger.info(f"[{meeting_dir}] Summary generation completed in {time.time() - start:.2f}초")
+            if step == "summary":
+                return
 
-        diar_result = stt_pipe.read_rttm(rttm_path)
-        stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
-        print(f'STT Done !: {time.time() - start}초')
-        await broker.publish(meeting_dir, {"code": "005", "stage": "STT", "message": "stt done"})
+        # 전체 프로세스 완료
+        print(f'[{meeting_dir}] All processing completed: {time.time() - start}초')
+        logger.info(f"[{meeting_dir}] All processing completed in {time.time() - start:.2f}초")
 
-        stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
-        os.makedirs(stt_dir, exist_ok=True)
-        stt_file_name = os.path.join(stt_dir, 'stt.json')
-        with open(stt_file_name, "w", encoding="utf-8") as f:
-            json.dump(stt_result, f, ensure_ascii=False, indent=2)
-
-        stt_result_loaded = summary_pipe.read_stt_result(stt_file_name)
-        stt_results = summary_pipe.split_stt_result(stt_result_loaded, chunk_count=3)
-        chunk_summary = ""
-        for idx in range(len(stt_results)):
-            summary_result = summary_pipe.summarize(openai_summary_model, stt_results[idx],
-                                                    system_prompt=default_system_prompt,
-                                                    subrole_prompt=default_subrole_prompt)
-            chunk_summary += summary_result + '\n\n'
-            await broker.publish(meeting_dir, {"code": "006", "stage": "SUMMARIZE_PART", "message": f"part {idx+1}/3 summarized"})
-
-        total_summary = summary_pipe.summarize(openai_summary_model, chunk_summary,
-                                               system_prompt=concat_system_prompt, subrole_prompt='')
-        markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
-        print(f'Summarize Done !: {time.time() - start}초')
-        summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
-        os.makedirs(summary_dir, exist_ok=True)
-        save_file_name = f'summary.html'
-        html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
-        with open(os.path.join(summary_dir, save_file_name), "w", encoding="utf-8") as f:
-            f.write(html_text)
-        await broker.publish(meeting_dir, {"code": "007", "stage": "DONE", "message": "all done",
-                                           "elapsed": time.time() - start})
     except Exception as e:
-        logging.exception(e)
-        await broker.publish(meeting_dir, {"code": "ERR", "stage": "ERROR", "message": str(e)})
+        print(f'[{meeting_dir}] Error: {e}')
+        logging.exception(f"[{meeting_dir}] Processing error: {e}")
 
 
 @app.post("/summarize_audio")
