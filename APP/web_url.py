@@ -37,6 +37,7 @@ file_path = os.getenv('FILE_PATH', './dataset/audio/')
 vad_config = os.path.join('./models', 'pyannote_vad_config.yaml')
 diar_config = os.path.join('./models', 'pyannote_diarization_config.yaml')
 app_data_dir = '/faicord/dataset/app/'
+APP_WEBHOOK_STEP_COMPLETED = os.getenv('APP_WEBHOOK_STEP_COMPLETED', 'http://faicord-backend:8080/api/app/webhook/step-completed')
 
 with open('./config/generation_config.json') as f:
     generation_config = json.load(f)
@@ -239,8 +240,10 @@ def process_audio_app_logic(
     audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
     wav_file_name = audio_file_path.replace('.m4a', '.wav')
     rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
+    current_step = None
     try:
         if not step or step == "diarization":
+            current_step = "diarization"
             print(f"[{meeting_dir}] Starting diarization (with preprocessing)...")
             logger.info(f"[{meeting_dir}] Diarization (with preprocessing) started")
             # Preprocess
@@ -257,11 +260,22 @@ def process_audio_app_logic(
             diar_pipe.save_merged_rttm(final_diar, rttm_path)
             print(f'[{meeting_dir}] Diarization Done !: {time.time() - start}초')
             logger.info(f"[{meeting_dir}] Diarization completed in {time.time() - start:.2f}초")
+            # notify backend
+            try:
+                requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
+                    "meetingId": meeting_dir,
+                    "step": "diarization",
+                    "status": "COMPLETED",
+                    "fileName": file_name,
+                })
+            except Exception:
+                logger.warning(f"[{meeting_dir}] Webhook notify failed for diarization")
             if step == "diarization":
                 return
 
         # Step 2: TRANSCRIPTION (음성 인식)
         if not step or step == "transcription":
+            current_step = "transcription"
             print(f"[{meeting_dir}] Starting speech transcription...")
             logger.info(f"[{meeting_dir}] Speech transcription started")
             diar_result = stt_pipe.read_rttm(rttm_path)
@@ -275,11 +289,22 @@ def process_audio_app_logic(
                 json.dump(stt_result, f, ensure_ascii=False, indent=2)
             
             logger.info(f"[{meeting_dir}] Speech transcription completed in {time.time() - start:.2f}초")
+            # notify backend
+            try:
+                requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
+                    "meetingId": meeting_dir,
+                    "step": "transcription",
+                    "status": "COMPLETED",
+                    "fileName": file_name,
+                })
+            except Exception:
+                logger.warning(f"[{meeting_dir}] Webhook notify failed for transcription")
             if step == "transcription":
                 return
 
         # Step 3: SUMMARY (요약)
         if not step or step == "summary":
+            current_step = "summary"
             print(f"[{meeting_dir}] Starting summary generation...")
             logger.info(f"[{meeting_dir}] Summary generation started")
             stt_result_loaded = summary_pipe.read_stt_result(stt_file_name)
@@ -305,6 +330,16 @@ def process_audio_app_logic(
                 f.write(html_text)
             
             logger.info(f"[{meeting_dir}] Summary generation completed in {time.time() - start:.2f}초")
+            # notify backend
+            try:
+                requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
+                    "meetingId": meeting_dir,
+                    "step": "summary",
+                    "status": "COMPLETED",
+                    "fileName": file_name,
+                })
+            except Exception:
+                logger.warning(f"[{meeting_dir}] Webhook notify failed for summary")
             if step == "summary":
                 return
 
@@ -315,6 +350,15 @@ def process_audio_app_logic(
     except Exception as e:
         print(f'[{meeting_dir}] Error: {e}')
         logging.exception(f"[{meeting_dir}] Processing error: {e}")
+        try:
+            requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
+                "meetingId": meeting_dir,
+                "step": current_step or (step or "unknown"),
+                "status": "FAILED",
+                "fileName": file_name,
+            })
+        except Exception:
+            logger.warning(f"[{meeting_dir}] Webhook notify failed on error")
 
 
 @app.post("/summarize_audio")
