@@ -238,35 +238,29 @@ def process_audio_app_logic(
     start = time.time()
     audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
     wav_file_name = audio_file_path.replace('.m4a', '.wav')
+    rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
     try:
-        if not step or step == "preprocess":
-            print(f"[{meeting_dir}] Starting audio preprocessing...")
-            logger.info(f"[{meeting_dir}] Audio preprocessing started")
+        if not step or step == "diarization":
+            print(f"[{meeting_dir}] Starting diarization (with preprocessing)...")
+            logger.info(f"[{meeting_dir}] Diarization (with preprocessing) started")
+            # Preprocess
             clean_audio = frontend_pipe.process_audio(audio_file_path, chunk_length=300, deverve=True)
             vad_result = vad_pipe.get_vad_timestamp(clean_audio)
-            print(f'[{meeting_dir}] Audio preprocessing completed: {time.time() - start}초')
-            logger.info(f"[{meeting_dir}] Audio preprocessing completed in {time.time() - start:.2f}초")
-            if step == "preprocess":
-                return
 
-        # Step 2: SPEAKER (화자 분리)
-        if not step or step == "speaker":
-            print(f"[{meeting_dir}] Starting speaker diarization...")
-            logger.info(f"[{meeting_dir}] Speaker diarization started")
+            # Diarization
             diar_result, _ = diar_pipe.get_diar(wav_file_name, return_embeddings=False)
             processed_diar, non_overlapped_diar = diar_pipe.preprocess_result(diar_result=diar_result, vad_result=vad_result)
             chunk_emb_array = postprocess_pipe.get_chunk_emb_array(wav_file_name, non_overlapped_diar)
             label_mapping_dict = postprocess_pipe.build_label_mapping_dict(chunk_emb_array)
             full_diar = postprocess_pipe.apply_labels_to_full_diar(processed_diar, non_overlapped_diar)
             final_diar = postprocess_pipe.apply_label_mapping_to_diar(full_diar, label_mapping_dict)
-            rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
             diar_pipe.save_merged_rttm(final_diar, rttm_path)
-            print(f'[{meeting_dir}] Speaker Diarization Done !: {time.time() - start}초')
-            logger.info(f"[{meeting_dir}] Speaker diarization completed in {time.time() - start:.2f}초")
-            if step == "speaker":
+            print(f'[{meeting_dir}] Diarization Done !: {time.time() - start}초')
+            logger.info(f"[{meeting_dir}] Diarization completed in {time.time() - start:.2f}초")
+            if step == "diarization":
                 return
 
-        # Step 3: TRANSCRIPTION (음성 인식)
+        # Step 2: TRANSCRIPTION (음성 인식)
         if not step or step == "transcription":
             print(f"[{meeting_dir}] Starting speech transcription...")
             logger.info(f"[{meeting_dir}] Speech transcription started")
@@ -284,7 +278,7 @@ def process_audio_app_logic(
             if step == "transcription":
                 return
 
-        # Step 4: SUMMARY (요약)
+        # Step 3: SUMMARY (요약)
         if not step or step == "summary":
             print(f"[{meeting_dir}] Starting summary generation...")
             logger.info(f"[{meeting_dir}] Summary generation started")
