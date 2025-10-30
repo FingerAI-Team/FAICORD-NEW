@@ -245,7 +245,7 @@ def process_audio_app_logic(
     stt_file_name = os.path.join(stt_dir, 'stt.json')
     summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
     os.makedirs(summary_dir, exist_ok=True)
-    save_file_name = f'summary.html'
+    summary_file_name = f'summary.html'
 
     current_step = None
     try:
