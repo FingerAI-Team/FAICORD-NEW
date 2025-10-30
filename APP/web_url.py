@@ -240,6 +240,11 @@ def process_audio_app_logic(
     audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
     wav_file_name = audio_file_path.replace('.m4a', '.wav')
     rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
+    stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
+    stt_file_name = os.path.join(stt_dir, 'stt.json')
+    summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
+    summary_file_name = f'summary.html'
+
     current_step = None
     try:
         if not step or step == "diarization":
@@ -281,15 +286,10 @@ def process_audio_app_logic(
             diar_result = stt_pipe.read_rttm(rttm_path)
             stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
             print(f'[{meeting_dir}] Transcription Done !: {time.time() - start}초')
-            
-            stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
-            os.makedirs(stt_dir, exist_ok=True)
-            stt_file_name = os.path.join(stt_dir, 'stt.json')
             with open(stt_file_name, "w", encoding="utf-8") as f:
                 json.dump(stt_result, f, ensure_ascii=False, indent=2)
             
             logger.info(f"[{meeting_dir}] Speech transcription completed in {time.time() - start:.2f}초")
-            # notify backend
             try:
                 requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
                     "meetingId": meeting_dir,
@@ -321,11 +321,9 @@ def process_audio_app_logic(
                                                    system_prompt=concat_system_prompt, subrole_prompt='')
             markdown_text = summary_pipe.convert_minutes_to_markdown(total_summary)
             print(f'[{meeting_dir}] Summary Done !: {time.time() - start}초')
-            summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
-            os.makedirs(summary_dir, exist_ok=True)
-            save_file_name = f'summary.html'
+            
             html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
-            summary_file_path = os.path.join(summary_dir, save_file_name)
+            summary_file_path = os.path.join(summary_dir, summary_file_name)
             with open(summary_file_path, "w", encoding="utf-8") as f:
                 f.write(html_text)
             
