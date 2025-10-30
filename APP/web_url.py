@@ -241,9 +241,11 @@ def process_audio_app_logic(
     wav_file_name = audio_file_path.replace('.m4a', '.wav')
     rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
     stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
+    os.makedirs(stt_dir, exist_ok=True)
     stt_file_name = os.path.join(stt_dir, 'stt.json')
     summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
-    summary_file_name = f'summary.html'
+    os.makedirs(summary_dir, exist_ok=True)
+    save_file_name = f'summary.html'
 
     current_step = None
     try:
