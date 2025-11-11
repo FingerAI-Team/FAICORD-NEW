@@ -207,7 +207,7 @@ async def upload_audio_app(
 @app.post("/process_audio_app")
 async def process_audio_app(
     background_tasks: BackgroundTasks,
-    meeting_dir: Optional[str] = Form(None),
+    meeting_dir: Optional[str] = Form(None),   # meetingId
     file_name: Optional[str] = Form(None),
     step: Optional[str] = Form(None),
 ):
@@ -233,15 +233,23 @@ def process_audio_app_logic(
     file_name: str, meeting_dir: str, step: Optional[str] = None
 ):
     start = time.time()
-    audio_file_path = os.path.join(app_data_dir, 'audio', file_name)   # /faicord/dataset/app
+    audio_file_path = os.path.join(app_data_dir, 'audio', meeting_dir, file_name)   # /faicord/dataset/app
     wav_file_name = audio_file_path.replace('.m4a', '.wav')
-    rttm_path = wav_file_name.replace('/audio', '/diar_results').replace('.wav', '.rttm')
+
+    rttm_dir = os.path.join(app_data_dir, 'diar_results', meeting_dir)
+    os.makedirs(rttm_dir, exist_ok=True)
+    rttm_file_name = f'diarization.rttm'
+    rttm_path = os.path.join(rttm_dir, rttm_file_name)
+    
     stt_dir = os.path.join(app_data_dir, 'stt_results', meeting_dir)
     os.makedirs(stt_dir, exist_ok=True)
-    stt_file_name = os.path.join(stt_dir, 'stt.json')
+    stt_file_name = f'stt.json'
+    stt_path = os.path.join(stt_dir, stt_file_name)
+
     summary_dir = os.path.join(app_data_dir, 'summary_results', meeting_dir)
     os.makedirs(summary_dir, exist_ok=True)
     summary_file_name = f'summary.html'
+    summary_path = os.path.join(summary_dir, summary_file_name)
 
     current_step = None
     try:
@@ -249,7 +257,6 @@ def process_audio_app_logic(
             current_step = "diarization"
             print(f"[{meeting_dir}] Starting diarization (with preprocessing)...")
             logger.info(f"[{meeting_dir}] Diarization (with preprocessing) started")
-            # Preprocess
             clean_audio = frontend_pipe.process_audio(audio_file_path, chunk_length=300, deverve=True)
             vad_result = vad_pipe.get_vad_timestamp(clean_audio)
 
@@ -263,8 +270,7 @@ def process_audio_app_logic(
             diar_pipe.save_merged_rttm(final_diar, rttm_path)
             print(f'[{meeting_dir}] Diarization Done !: {time.time() - start}초')
             logger.info(f"[{meeting_dir}] Diarization completed in {time.time() - start:.2f}초")
-            # notify backend
-            try:
+            try:   # notify backend
                 requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
                     "meetingId": meeting_dir,
                     "step": "diarization",
@@ -284,11 +290,11 @@ def process_audio_app_logic(
             diar_result = stt_pipe.read_rttm(rttm_path)
             stt_result = stt_pipe.transcribe_by_rttm(wav_file_name, diar_result)
             print(f'[{meeting_dir}] Transcription Done !: {time.time() - start}초')
-            with open(stt_file_name, "w", encoding="utf-8") as f:
+            with open(stt_path, "w", encoding="utf-8") as f:
                 json.dump(stt_result, f, ensure_ascii=False, indent=2)
             
             logger.info(f"[{meeting_dir}] Speech transcription completed in {time.time() - start:.2f}초")
-            try:
+            try:   # notify backend
                 requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
                     "meetingId": meeting_dir,
                     "step": "transcription",
@@ -305,7 +311,7 @@ def process_audio_app_logic(
             current_step = "summary"
             print(f"[{meeting_dir}] Starting summary generation...")
             logger.info(f"[{meeting_dir}] Summary generation started")
-            stt_result_loaded = summary_pipe.read_stt_result(stt_file_name)
+            stt_result_loaded = summary_pipe.read_stt_result(stt_path)
             stt_results = summary_pipe.split_stt_result(stt_result_loaded, chunk_count=3)
             chunk_summary = ""
             for idx in range(len(stt_results)):
@@ -321,13 +327,11 @@ def process_audio_app_logic(
             print(f'[{meeting_dir}] Summary Done !: {time.time() - start}초')
             
             html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
-            summary_file_path = os.path.join(summary_dir, summary_file_name)
-            with open(summary_file_path, "w", encoding="utf-8") as f:
+            with open(summary_path, "w", encoding="utf-8") as f:
                 f.write(html_text)
             
             logger.info(f"[{meeting_dir}] Summary generation completed in {time.time() - start:.2f}초")
-            # notify backend
-            try:
+            try:   # notify backend
                 requests.post(APP_WEBHOOK_STEP_COMPLETED, params={
                     "meetingId": meeting_dir,
                     "step": "summary",
@@ -338,11 +342,8 @@ def process_audio_app_logic(
                 logger.warning(f"[{meeting_dir}] Webhook notify failed for summary")
             if step == "summary":
                 return
-
-        # 전체 프로세스 완료
         print(f'[{meeting_dir}] All processing completed: {time.time() - start}초')
         logger.info(f"[{meeting_dir}] All processing completed in {time.time() - start:.2f}초")
-
     except Exception as e:
         print(f'[{meeting_dir}] Error: {e}')
         logging.exception(f"[{meeting_dir}] Processing error: {e}")
