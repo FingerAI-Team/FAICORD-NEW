@@ -182,13 +182,10 @@ def process_audio_logic(file_name: str, webhook_url: Optional[str] = None, job_i
 async def upload_audio_app(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    file_name: Optional[str] = Form(None),
-    meeting_date: Optional[str] = Form(None),
-    topic: Optional[str] = Form(None),
-    participants: Optional[str] = Form(None),
+    meetingId: Optional[str] = Form(None),
 ):
     try:
-        save_dir = "/faicord/dataset/app/audio"
+        save_dir = f"/faicord/dataset/app/audio/{meetingId}"
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, file.filename)
 
@@ -200,7 +197,6 @@ async def upload_audio_app(
                     break
                 f.write(chunk)
         print(f"✅ Upload complete: {file.filename}")
-        print(f"📅 Date={meeting_date}, 🗂 Topic={topic}, 👥 Participants={participants}")
         return {"status": "success", "message": "Audio uploaded and processing started."}
     except Exception as e:
         import traceback
