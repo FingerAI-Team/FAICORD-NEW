@@ -15,7 +15,12 @@ import base64
 import time
 import json
 import os
-import io 
+import io
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False 
 
 load_dotenv()
 
@@ -329,6 +334,16 @@ def process_audio_app_logic(
             html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
             with open(summary_path, "w", encoding="utf-8") as f:
                 f.write(html_text)
+            
+            # Save as PDF if weasyprint is available
+            if WEASYPRINT_AVAILABLE:
+                try:
+                    pdf_path = summary_path.replace('.html', '.pdf')
+                    HTML(string=html_text).write_pdf(pdf_path)
+                    print(f'[{meeting_dir}] Summary PDF saved: {pdf_path}')
+                    logger.info(f"[{meeting_dir}] Summary PDF saved: {pdf_path}")
+                except Exception as e:
+                    logger.warning(f"[{meeting_dir}] Failed to generate PDF: {e}")
             
             logger.info(f"[{meeting_dir}] Summary generation completed in {time.time() - start:.2f}초")
             try:   # notify backend
