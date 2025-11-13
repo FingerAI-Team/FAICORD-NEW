@@ -1,0 +1,26 @@
+# Py3.11 안정 세트
+torchaudio==2.0.1
+torchmetrics==1.3.2
+fsspec==2024.6.1
+numpy==1.26.4
+scipy==1.11.4
+numba==0.59.1
+llvmlite==0.42.0
+audioread==3.0.1
+librosa==0.10.2.post1
+soundfile==0.12.1
+
+# 웹/서빙
+fastapi==0.118.3
+starlette==0.47.3
+uvicorn==0.37.0
+sse-starlette==3.0.1
+markdown==3.8.2
+flask==3.1.1
+matplotlib==3.9.2
+seaborn==0.13.2
+
+# DB/런타임
+pymilvus==2.4.8
+milvus-lite>=2.4,<2.5
+onnxruntime==1.17.3
