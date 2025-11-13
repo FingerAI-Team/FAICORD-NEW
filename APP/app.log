@@ -78,3 +78,43 @@
 [2025-10-13 02:19:08,093] [INFO] [app_logger:85] - [4d969a81-23c2-4669-9434-ad7a04dc35e7_음성 251013_100330.m4a]
 [2025-10-13 02:20:04,212] [INFO] [app_logger:85] - [e887b316-7202-43da-9f56-392726230fdd_새로운 녹음 31.m4a]
 [2025-10-13 08:40:14,069] [INFO] [app_logger:85] - [349b4b45-3f26-41b9-ac0c-7efdcffeee1e_회의록 내부 회의.m4a]
+[2025-11-12 09:07:07,030] [INFO] [app_logger:220] - [20250623_AI TFT.wav] step: diarization
+[2025-11-12 09:07:07,032] [INFO] [app_logger:264] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Diarization (with preprocessing) started
+[2025-11-12 09:10:33,932] [INFO] [app_logger:277] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Diarization completed in 206.90초
+[2025-11-12 09:10:33,957] [INFO] [app_logger:220] - [20250623_AI TFT.wav] step: transcription
+[2025-11-12 09:10:33,959] [INFO] [app_logger:294] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Speech transcription started
+[2025-11-12 09:13:18,424] [INFO] [app_logger:301] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Speech transcription completed in 164.46초
+[2025-11-12 09:13:18,444] [INFO] [app_logger:220] - [20250623_AI TFT.wav] step: summary
+[2025-11-12 09:13:18,446] [INFO] [app_logger:318] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Summary generation started
+[2025-11-12 09:14:09,857] [INFO] [app_logger:344] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Summary PDF saved: /faicord/dataset/app/summary_results/c4d6bd5e-04ec-4a39-a714-7a7e309e27bd/summary.pdf
+[2025-11-12 09:14:09,857] [INFO] [app_logger:348] - [c4d6bd5e-04ec-4a39-a714-7a7e309e27bd] Summary generation completed in 51.41초
+[2025-11-12 10:06:20,460] [INFO] [app_logger:220] - [250804_ai_meeting.m4a] step: diarization
+[2025-11-12 10:06:20,461] [INFO] [app_logger:264] - [31d4c761-f97a-4243-907c-a19c56468d38] Diarization (with preprocessing) started
+[2025-11-12 10:07:38,429] [INFO] [app_logger:277] - [31d4c761-f97a-4243-907c-a19c56468d38] Diarization completed in 77.97초
+[2025-11-12 10:07:38,450] [INFO] [app_logger:220] - [250804_ai_meeting.m4a] step: transcription
+[2025-11-12 10:07:38,453] [INFO] [app_logger:294] - [31d4c761-f97a-4243-907c-a19c56468d38] Speech transcription started
+[2025-11-12 10:08:12,937] [INFO] [app_logger:301] - [31d4c761-f97a-4243-907c-a19c56468d38] Speech transcription completed in 34.48초
+[2025-11-12 10:08:12,955] [INFO] [app_logger:220] - [250804_ai_meeting.m4a] step: summary
+[2025-11-12 10:08:12,956] [INFO] [app_logger:318] - [31d4c761-f97a-4243-907c-a19c56468d38] Summary generation started
+[2025-11-12 10:09:04,296] [INFO] [app_logger:344] - [31d4c761-f97a-4243-907c-a19c56468d38] Summary PDF saved: /faicord/dataset/app/summary_results/31d4c761-f97a-4243-907c-a19c56468d38/summary.pdf
+[2025-11-12 10:09:04,296] [INFO] [app_logger:348] - [31d4c761-f97a-4243-907c-a19c56468d38] Summary generation completed in 51.34초
+[2025-11-12 10:13:11,018] [INFO] [app_logger:220] - [chunk_0_non_overlapped_20250102_chunk_39.wav] step: diarization
+[2025-11-12 10:13:11,020] [INFO] [app_logger:264] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Diarization (with preprocessing) started
+[2025-11-12 10:13:11,476] [INFO] [app_logger:277] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Diarization completed in 0.46초
+[2025-11-12 10:13:11,494] [INFO] [app_logger:220] - [chunk_0_non_overlapped_20250102_chunk_39.wav] step: transcription
+[2025-11-12 10:13:11,496] [INFO] [app_logger:294] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Speech transcription started
+[2025-11-12 10:13:12,287] [INFO] [app_logger:301] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Speech transcription completed in 0.79초
+[2025-11-12 10:13:12,305] [INFO] [app_logger:220] - [chunk_0_non_overlapped_20250102_chunk_39.wav] step: summary
+[2025-11-12 10:13:12,306] [INFO] [app_logger:318] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Summary generation started
+[2025-11-12 10:13:18,846] [INFO] [app_logger:344] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Summary PDF saved: /faicord/dataset/app/summary_results/4410a001-427d-4ac1-ba82-c4a6971ef5fc/summary.pdf
+[2025-11-12 10:13:18,846] [INFO] [app_logger:348] - [4410a001-427d-4ac1-ba82-c4a6971ef5fc] Summary generation completed in 6.54초
+[2025-11-12 10:16:39,112] [INFO] [app_logger:220] - [음성 250818_170032.m4a] step: diarization
+[2025-11-12 10:16:39,114] [INFO] [app_logger:264] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Diarization (with preprocessing) started
+[2025-11-12 10:20:13,972] [INFO] [app_logger:277] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Diarization completed in 214.86초
+[2025-11-12 10:20:13,996] [INFO] [app_logger:220] - [음성 250818_170032.m4a] step: transcription
+[2025-11-12 10:20:13,999] [INFO] [app_logger:294] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Speech transcription started
+[2025-11-12 10:22:08,093] [INFO] [app_logger:301] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Speech transcription completed in 114.09초
+[2025-11-12 10:22:08,115] [INFO] [app_logger:220] - [음성 250818_170032.m4a] step: summary
+[2025-11-12 10:22:08,117] [INFO] [app_logger:318] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Summary generation started
+[2025-11-12 10:22:53,318] [INFO] [app_logger:344] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Summary PDF saved: /faicord/dataset/app/summary_results/d332cf94-9f4f-47f9-8d77-b31c4b9eebb7/summary.pdf
+[2025-11-12 10:22:53,318] [INFO] [app_logger:348] - [d332cf94-9f4f-47f9-8d77-b31c4b9eebb7] Summary generation completed in 45.20초

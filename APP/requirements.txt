@@ -29,4 +29,5 @@ fastapi
 uvicorn[standard]
 python-multipart
 matplotlib
+sse_starlette
 weasyprint  # HTML to PDF conversion (requires system dependencies: cairo, pango, gdk-pixbuf)
