@@ -1,7 +1,6 @@
 from src import VoiceAnalyzer
 from dotenv import load_dotenv
 import argparse
-import load_dotenv
 import json
 import os
 
