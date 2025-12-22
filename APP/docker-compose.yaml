@@ -1,6 +1,6 @@
 services:
   app:
-    container_name: faicord
+    container_name: faicord-test
     image: faicord:latest
     build:
       context: .
