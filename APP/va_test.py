@@ -9,7 +9,10 @@ def main(args):
     api_key = os.getenv("STT_API_KEY")
     analyzer = VoiceAnalyzer(api_key=api_key)
     result = analyzer.analyze(file_path=args.file_path, input_type=args.input_type)
-    print(json.dumps(result, indent=4, ensure_ascii=False))
+    json_result = json.dumps(result, idnent=4, ensure_ascii=False)
+    with open('api-test.json', "w", encoding="utf-8") as f:
+        json.dump(json_result, f, ensure_ascii=False, indent=2)
+
 
 if __name__ == "__main__":
     cli_parser = argparse.ArgumentParser(description="Voice Analyzer Test")
