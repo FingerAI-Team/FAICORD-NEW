@@ -1,6 +1,8 @@
 '''
 Synapsoft STT 서비스 활용 모듈 
 '''
+from email.mime import text
+import json
 import requests
 
 class VoiceAnalyzer:
@@ -13,5 +15,16 @@ class VoiceAnalyzer:
             'input_type': (None, input_type),
             'file_path': (None, file_path),
         }
-        response = requests.post('http://127.0.0.1:8000/asr', files=files)
+        response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
         return response.json()
+
+    def extract_text(self, analysis_result: dict):
+        return analysis_result["result"]["text"]  
+        
+    def process_rttm_for_stt(self, rttm_df):
+        rttm_df["end"] = rttm_df["start"] + rttm_df["duration"]
+        return rttm_df[["start", "end"]].values.tolist()
+
+    def save_result_to_json(self, analysis_result: dict, save_path: str):
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(analysis_result, f, ensure_ascii=False, indent=2)

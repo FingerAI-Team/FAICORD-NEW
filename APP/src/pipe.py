@@ -208,7 +208,7 @@ class DIARPipe(BasePipeline):
                     f.write(rttm_line)    
 
 class STTPipe(BasePipeline):
-    def __init__(self, whisper_api, generation_config):
+    def __init__(self, whisper_api=None, generation_config=None):
         super().__init__()
         self.audio_processor = AudioFileProcessor()
         self.stt_model = WhisperSTT(whisper_api, generation_config)
