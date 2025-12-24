@@ -211,7 +211,8 @@ class STTPipe(BasePipeline):
     def __init__(self, whisper_api=None, generation_config=None):
         super().__init__()
         self.audio_processor = AudioFileProcessor()
-        self.stt_model = WhisperSTT(whisper_api, generation_config)
+        if whisper_api is not None and generation_config is not None:
+            self.stt_model = WhisperSTT(whisper_api, generation_config)
 
     def chunk_audio(self, audio_file, chunk_length=None, start_time=None, end_time=None):
         return self.audio_processor.chunk_audio(audio_file, chunk_length, start_time, end_time)
