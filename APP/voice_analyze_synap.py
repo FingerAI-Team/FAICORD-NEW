@@ -24,7 +24,7 @@ def main(args):
 
 if __name__ == "__main__":
     cli_parser = argparse.ArgumentParser(description="Voice Analyzer Test")
-    cli_parser.add_argument("--file_path", type=str, required=True, help="Path to the audio file to be analyzed")
+    cli_parser.add_argument("--file_name", type=str, required=True, help="Path to the audio file to be analyzed")
     cli_parser.add_argument("--input_type", type=str, default="local", help="Type of input (default: local)")
     main_args = cli_parser.parse_args()
     main(main_args)
