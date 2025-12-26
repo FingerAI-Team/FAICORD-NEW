@@ -23,7 +23,7 @@ class VoiceAnalyzer:
             'api_key': (None, self.api_key),
             'input_type': (None, input_type),
             'file_path': (None, file_path),
-            'segment_timeline': (None, timeline),
+            'segment_timeline': (None, json.dumps(timeline)),
         }
         response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
         return response.json()
