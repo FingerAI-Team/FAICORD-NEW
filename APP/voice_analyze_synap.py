@@ -18,7 +18,7 @@ def main(args):
     rttm_result = stt_pipe.read_rttm(rttm_file)
     ''' analyze with diar info '''
     processed_rttm = analyzer.process_rttm_for_stt(rttm_result)
-    result = analyzer.analyze(file_path=va_file_path, input_type=args.input_type, timeline=processed_rttm)
+    result = analyzer.analyze_with_timeline(file_path=va_file_path, input_type=args.input_type, timeline=processed_rttm)
     save_file_name = local_file_path.split('/')[-1].split('.')[0] + '_va.json'   # va: voice analyzer
     analyzer.save_result_to_json(analysis_result=result, save_path=os.path.join('./dataset/stt_results/', save_file_name))
 
