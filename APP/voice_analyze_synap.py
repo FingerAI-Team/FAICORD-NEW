@@ -6,7 +6,7 @@ import os
 def main(args):
     load_dotenv()
     api_key = os.getenv("STT_API_KEY")
-    local_path = '/dataset/audio'
+    local_path = './dataset/audio'
     va_path = './data/samples'
     local_file_path = os.path.join(local_path, args.file_name)
     va_file_path = os.path.join(va_path, args.file_name)
