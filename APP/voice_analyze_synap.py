@@ -9,7 +9,7 @@ def main(args):
     analyzer = VoiceAnalyzer(api_key=api_key)
     stt_pipe = STTPipe()
     ''' load rttm file '''
-    rttm_file = args.file_name.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
+    rttm_file = args.file_path.replace('/audio/', '/rttm/').replace('.wav', '.rttm')
     rttm_result = stt_pipe.read_rttm(rttm_file)
     ''' analyze with diar info '''
     processed_rttm = analyzer.process_rttm_for_stt(rttm_result)

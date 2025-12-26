@@ -4,6 +4,9 @@ import argparse
 import os
 
 def main(args):
+    '''
+    ./data/samples/audio/f1624360-cfb8-4c78-b478-8a637a04b654_Bnk미팅.wav"
+    '''
     load_dotenv()
     api_key = os.getenv("STT_API_KEY")
     analyzer = VoiceAnalyzer(api_key=api_key)
