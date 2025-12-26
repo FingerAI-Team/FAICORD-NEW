@@ -18,6 +18,16 @@ class VoiceAnalyzer:
         response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
         return response.json()
 
+    def analyze_with_timeline(self, file_path: str, input_type: str = 'local', timeline: list = None):
+        files = {
+            'api_key': (None, self.api_key),
+            'input_type': (None, input_type),
+            'file_path': (None, file_path),
+            'segment_timeline': (None, timeline),
+        }
+        response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
+        return response.json()
+
     def extract_text(self, analysis_result: dict):
         return analysis_result["result"]["text"]  
         
