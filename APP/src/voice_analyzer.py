@@ -23,6 +23,8 @@ class VoiceAnalyzer:
             'api_key': (None, self.api_key),
             'input_type': (None, input_type),
             'file_path': (None, file_path),
+            'no_forcedalign': (None, True),
+            'no_diarlization': (None, True),
             'segment_timeline': (None, json.dumps(timeline)),
         }
         response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
@@ -33,6 +35,7 @@ class VoiceAnalyzer:
         
     def process_rttm_for_stt(self, rttm_df):
         rttm_df["end"] = rttm_df["start"] + rttm_df["duration"]
+        print(f"timeline: {rttm_df[['start', 'end']].values.tolist()}")
         return rttm_df[["start", "end"]].values.tolist()
 
     def save_result_to_json(self, analysis_result: dict, save_path: str):
