@@ -24,7 +24,7 @@ class VoiceAnalyzer:
             'input_type': (None, input_type),
             'file_path': (None, file_path),
             'no_forcedalign': (None, 'true'),
-            'no_diarlization': (None, 'true'),
+            'no_diarization': (None, 'true'),
             'segment_timeline': (None, json.dumps(timeline)),
         }
         response = requests.post('http://voice-analyzer-v2:8000/asr', files=files)
