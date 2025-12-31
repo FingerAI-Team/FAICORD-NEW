@@ -1,5 +1,6 @@
 from scipy.spatial.distance import cdist
 from pydub import AudioSegment
+from jiwer import cer 
 from io import BytesIO
 import soundfile as sf
 import numpy as np 
@@ -10,6 +11,13 @@ import re
 import os
 import io
 
+
+class FileProcessor:
+    def load_json(self, file_path):
+        import json
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
 
 class DataProcessor:    
     def cleanse_text(self, text):
@@ -24,6 +32,12 @@ class DataProcessor:
             text = text.rstrip(".")
         text = re.sub(r"\s+", " ", text).strip()
         return text 
+
+    def calc_cer(self, context_stt, context_answer):
+        cer_score = 0
+        for idx, _ in enumerate(context_stt):
+            cer_score += cer(context_stt['text'][idx], context_answer['text'][idx])
+        return cer_score / len(context_stt) if context_stt else 0
 
 
 class VectorProcessor:

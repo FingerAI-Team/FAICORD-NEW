@@ -1,4 +1,4 @@
-from .preprocessors import DataProcessor, AudioFileProcessor
+from .preprocessors import FileProcessor, DataProcessor, AudioFileProcessor
 from .audio_handler import VoiceEnhancer, NoiseHandler, AudioVisualizer
 from .pyannotes import PyannotVAD, PyannotDIAR, PyannotOSD
 from .embeddings import SBEMB, WSEMB, EMBVisualizer
