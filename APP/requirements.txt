@@ -23,6 +23,7 @@ umap-learn==0.5.6
 hdbscan==0.8.37
 markdown
 flask                 # 만약 Flask API도 일부 사용하는 경우 유지
+jiwer
 
 # FastAPI 관련 추가
 fastapi
