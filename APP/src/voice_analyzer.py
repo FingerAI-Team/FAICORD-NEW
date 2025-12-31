@@ -38,6 +38,18 @@ class VoiceAnalyzer:
         print(f"timeline: {rttm_df[['start', 'end']].values.tolist()}")
         return rttm_df[["start", "end"]].values.tolist()
 
-    def save_result_to_json(self, analysis_result: dict, save_path: str):
+    def process_stt_result(self, analysis_result: dict):
+        segments = analysis_result["result"]["segments"]
+        processed_segments = []
+        for segment in segments:
+            processed_segment = {
+                "start": segment["start"],
+                "end": segment["end"],
+                "text": segment["text"],
+            }
+            processed_segments.append(processed_segment)
+        return processed_segments
+
+    def save_result_to_json(self, processd_segments: list, save_path: str):
         with open(save_path, "w", encoding="utf-8") as f:
-            json.dump(analysis_result, f, ensure_ascii=False, indent=2)
+            json.dump(processd_segments, f, ensure_ascii=False, indent=2)
