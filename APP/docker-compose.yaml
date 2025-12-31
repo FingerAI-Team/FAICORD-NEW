@@ -19,6 +19,7 @@ services:
       - /data/uploaded_files/diar_results:/faicord/dataset/rttm 
       - /data/uploaded_files/stt_results/:/faicord/dataset/stt
       - /data/uploaded_files/summary_results/:/faicord/dataset/summary
+      - /data/uploaded_files/testset/:/faicord/dataset/testset
       - /data/app:/faicord/dataset/app
     ports:
       - "9050:9050"

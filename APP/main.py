@@ -67,7 +67,7 @@ def main(args):
     html_text = markdown.markdown(markdown_text, extensions=["fenced_code", "tables"])
     with open(os.path.join('./dataset/summary/', save_file_name), "w", encoding="utf-8") as f:
         f.write(html_text)
-    
+
 
 if __name__ == '__main__':
     cli_parser = argparse.ArgumentParser()
