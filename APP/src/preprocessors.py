@@ -35,7 +35,7 @@ class DataProcessor:
 
     def calc_cer(self, context_stt, context_answer):
         cer_score = 0
-        print(f'context stt: {context_stt}')
+        # print(f'context stt: {context_stt}')
         for idx, _ in enumerate(context_stt):
             cer_score += cer(context_stt[idx]['text'], context_answer[idx]['text'])
         return cer_score / len(context_stt) if context_stt else 0
