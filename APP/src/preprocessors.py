@@ -33,6 +33,32 @@ class DataProcessor:
         text = re.sub(r"\s+", " ", text).strip()
         return text 
 
+    def map_timeline(self, stt_json, answer_json):
+        mapped_result = []
+        answer_idx = 0
+        num_answers = len(answer_json)
+        for stt_entry in stt_json:
+            stt_start = stt_entry.get('start', 0)
+            stt_end = stt_entry.get('end', 0)
+            stt_text = self.cleanse_text(stt_entry.get('text', ''))
+            
+            while answer_idx < num_answers:   # answer 개수 
+                answer_entry = answer_json[answer_idx]
+                answer_start = round(answer_entry.get('start', 0), 3)
+                answer_end = round(answer_entry.get('end', 0), 3)
+                if stt_start >= answer_start and stt_end <= answer_end:
+                    mapped_result.append({
+                        'start': stt_start,
+                        'end': stt_end,
+                        'text': stt_text
+                    })
+                    break
+                elif stt_end < answer_start:
+                    break
+                else:
+                    answer_idx += 1
+        return mapped_result
+    
     def calc_cer(self, context_stt, context_answer):
         cer_score = 0
         print(f'len context stt: {len(context_stt)}')
