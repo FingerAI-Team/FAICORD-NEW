@@ -35,16 +35,18 @@ class DataProcessor:
 
     def map_timeline(self, stt_json, answer_json):
         mapped_result = []
-        for idx, stt_entry in enumerate(stt_json):
+        search_idx = 0 
+        for stt_entry in stt_json:
             stt_start = stt_entry.get('start', 0)
             stt_end = stt_entry.get('end', 0)
             stt_text = self.cleanse_text(stt_entry.get('text', ''))
-            if stt_start == round(answer_json[idx].get('start', 0), 3):
+            if stt_start == round(answer_json[search_idx].get('start', 0), 3):
                 mapped_result.append({
                     'start': stt_start,
                     'end': stt_end,
                     'text': stt_text
                 })
+                search_idx += 1
                 continue
         return mapped_result
     
