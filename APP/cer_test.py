@@ -8,13 +8,9 @@ import os
 
 def main(args):
     load_dotenv()
-    local_path = './dataset/testset'
-    local_file_path = os.path.join(local_path, args.file_name)
-    
     api_key = os.getenv("STT_API_KEY")
-    local_path = './dataset/audio'
-    va_path = './data/samples/audio'
-    local_file_path = os.path.join(local_path, args.file_name)
+    local_path = './dataset/testset'
+    local_file_path = os.path.join(local_path, args.file_name)   
     
     analyzer = VoiceAnalyzer(api_key=api_key)
     ''' load test & answer file '''
