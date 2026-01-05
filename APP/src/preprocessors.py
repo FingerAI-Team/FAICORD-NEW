@@ -35,28 +35,17 @@ class DataProcessor:
 
     def map_timeline(self, stt_json, answer_json):
         mapped_result = []
-        answer_idx = 0
-        num_answers = len(answer_json)
-        for stt_entry in stt_json:
+        for idx, stt_entry in enumerate(stt_json):
             stt_start = stt_entry.get('start', 0)
             stt_end = stt_entry.get('end', 0)
             stt_text = self.cleanse_text(stt_entry.get('text', ''))
-            
-            while answer_idx < num_answers:   # answer 개수 
-                answer_entry = answer_json[answer_idx]
-                answer_start = round(answer_entry.get('start', 0), 3)
-                answer_end = round(answer_entry.get('end', 0), 3)
-                if stt_start >= answer_start and stt_end <= answer_end:
-                    mapped_result.append({
-                        'start': stt_start,
-                        'end': stt_end,
-                        'text': stt_text
-                    })
-                    break
-                elif stt_end < answer_start:
-                    break
-                else:
-                    answer_idx += 1
+            if stt_start == round(answer_json[idx].get('start', 0), 3):
+                mapped_result.append({
+                    'start': stt_start,
+                    'end': stt_end,
+                    'text': stt_text
+                })
+                continue
         return mapped_result
     
     def calc_cer(self, context_stt, context_answer):
