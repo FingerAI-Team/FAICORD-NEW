@@ -19,6 +19,7 @@ def main(args):
 
     ''' calculate CER '''
     data_p = DataProcessor()
+    print(f'whisper_stt: {whisper_test_data}')
     whisper_stt = whisper_test_data['result']
     synap_stt = synap_test_data['result']
     cer_whisper = data_p.calc_cer(whisper_stt, answer_data)
