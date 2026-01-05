@@ -1,4 +1,4 @@
-from src import FileProcessor, DataProcessor
+from src import FileProcessor, DataProcessor, VoiceAnalyzer
 from dotenv import load_dotenv
 import argparse
 import markdown
@@ -11,6 +11,12 @@ def main(args):
     local_path = './dataset/testset'
     local_file_path = os.path.join(local_path, args.file_name)
     
+    api_key = os.getenv("STT_API_KEY")
+    local_path = './dataset/audio'
+    va_path = './data/samples/audio'
+    local_file_path = os.path.join(local_path, args.file_name)
+    
+    analyzer = VoiceAnalyzer(api_key=api_key)
     ''' load test & answer file '''
     file_p = FileProcessor()
     whisper_test_data = file_p.load_json(local_file_path)
@@ -26,6 +32,7 @@ def main(args):
     print(f'synap test data length: {len(synap_test_data)}')
     synap_new_data = data_p.map_timeline(synap_test_data, answer_data)
     print(f'synap_new: {len(synap_new_data)}')
+    analyzer.save_result_to_json(processd_segments=synap_new_data, save_path=local_file_path.replace('.json', '_va_mapped.json'))
     cer_whisper = data_p.calc_cer(whisper_test_data, answer_data)
     cer_synap = data_p.calc_cer(synap_new_data, answer_data)
     print(f"Whisper CER: {cer_whisper:.4f}")

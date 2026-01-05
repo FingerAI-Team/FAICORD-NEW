@@ -20,6 +20,7 @@ def main(args):
     processed_rttm = analyzer.process_rttm_for_stt(rttm_result)
     result = analyzer.analyze_with_timeline(file_path=va_file_path, input_type=args.input_type, timeline=processed_rttm)
     processd_segments = analyzer.process_stt_result(result)
+    
     save_file_name = local_file_path.split('/')[-1].split('.')[0] + '_va.json'   # va: voice analyzer
     analyzer.save_result_to_json(processd_segments=processd_segments, save_path=os.path.join('./dataset/stt/', save_file_name))
 
