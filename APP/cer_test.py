@@ -23,8 +23,9 @@ def main(args):
 
     ''' calculate CER '''
     data_p = DataProcessor()
+    print(f'synap test data length: {len(synap_test_data)}')
     synap_new_data = data_p.map_timeline(synap_test_data, answer_data)
-    print(f'synap_new: {synap_new_data}')
+    print(f'synap_new: {len(synap_new_data)}')
     cer_whisper = data_p.calc_cer(whisper_test_data, answer_data)
     cer_synap = data_p.calc_cer(synap_new_data, answer_data)
     print(f"Whisper CER: {cer_whisper:.4f}")
