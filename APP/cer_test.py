@@ -17,7 +17,8 @@ def main(args):
     synap_test_data = file_p.load_json(local_file_path.replace('.json', '_va.json'))
     answer_data = file_p.load_json(local_file_path.replace('.json', '_정답.json'))
 
-    print("stt type:", type(whisper_test_data))
+    print("whisper stt type:", type(whisper_test_data))
+    print("synap stt type", type(synap_test_data))
     print("answer type:", type(answer_data))
 
     ''' calculate CER '''
