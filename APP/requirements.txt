@@ -1,5 +1,6 @@
 # 기존 패키지들
 huggingface-hub
+transformers
 openai
 pandas 
 tqdm
